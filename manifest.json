@@ -1,0 +1,15 @@
+{
+  "name": "東京家族旅行 2026",
+  "short_name": "東京旅伴",
+  "description": "2026/09/18–09/27 東京家族旅行行程地圖",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#D44820",
+  "background_color": "#E8DCC8",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

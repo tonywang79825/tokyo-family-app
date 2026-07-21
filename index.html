@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>東京家族旅行 2026</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#D44820">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="東京旅伴">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root{
+    --map-bg:#E8DCC8;
+    --accent:#D44820;
+    --accent-dark:#B23A18;
+    --ink:#2E2822;
+    --ink-soft:#6B6255;
+    --paper:#FFFCF6;
+    --paper-2:#F3ECDF;
+    --green:#4C8B5C;
+    --orange:#D4892A;
+    --gray2:#9B9184;
+    --red:#C0392B;
+    --cat-meal:#C87A3D;
+    --cat-stay:#3E7A78;
+    --cat-transit:#9B9184;
+    --shadow: 0 8px 30px rgba(46,40,34,.18);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--map-bg);color:var(--ink);}
+  #map{position:fixed;inset:0;z-index:1;}
+  #map.warm{filter:sepia(.18) saturate(1.15) hue-rotate(-6deg) brightness(1.03);}
+
+  /* ---------- Top overlay ---------- */
+  .top-overlay{position:fixed;top:0;left:0;right:0;z-index:500;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 10px;
+    background:linear-gradient(to bottom, rgba(232,220,200,.92), rgba(232,220,200,0));
+    pointer-events:none;}
+  .status-bar{display:flex;align-items:center;justify-content:space-between;pointer-events:auto;
+    background:rgba(255,252,246,.85);backdrop-filter:blur(10px);border-radius:16px;padding:10px 14px;box-shadow:var(--shadow);margin-bottom:8px;}
+  .status-bar .title{font-weight:900;font-size:15px;}
+  .status-bar .sub{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .status-bar .clock{font-weight:700;font-size:14px;color:var(--accent);}
+  .day-chips{display:flex;gap:6px;overflow-x:auto;pointer-events:auto;padding:2px;scrollbar-width:none;}
+  .day-chips::-webkit-scrollbar{display:none;}
+  .chip{flex:none;background:rgba(255,252,246,.85);backdrop-filter:blur(10px);border:2px solid transparent;border-radius:20px;
+    padding:6px 12px;font-size:12px;font-weight:700;color:var(--ink-soft);box-shadow:0 2px 8px rgba(46,40,34,.1);cursor:pointer;white-space:nowrap;}
+  .chip.active{background:var(--accent);color:#fff;border-color:var(--accent-dark);}
+  .chip .d{font-size:10px;display:block;font-weight:500;opacity:.85;}
+
+  /* ---------- Compass FAB & shopping FAB ---------- */
+  .fab{position:fixed;z-index:400;width:48px;height:48px;border-radius:50%;background:var(--paper);box-shadow:var(--shadow);
+    display:flex;align-items:center;justify-content:center;font-size:20px;border:none;cursor:pointer;}
+  .fab-compass{right:14px;bottom:210px;}
+  .fab-shop{right:14px;bottom:270px;background:var(--accent);color:#fff;}
+  .fab-ticket{right:14px;bottom:330px;}
+  .fab-locate{right:14px;bottom:390px;}
+  .fab-sim{right:14px;bottom:450px;background:#333;color:#fff;font-size:12px;font-weight:bold;width:48px;}
+  .fab-simplay{right:14px;bottom:510px;background:var(--accent);color:#fff;font-size:11px;font-weight:bold;width:48px;}
+  .fab-simplay.playing{background:var(--green);}
+
+  /* ---------- Bottom sheet ---------- */
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:600;background:var(--paper);
+    border-radius:22px 22px 0 0;box-shadow:0 -8px 30px rgba(46,40,34,.25);
+    transform:translateY(0);transition:height .38s cubic-bezier(.34,1.56,.64,1);touch-action:none;
+    height:190px;padding-bottom:env(safe-area-inset-bottom,0px);}
+  .sheet.expanded{height:calc(100% - 130px);}
+  .sheet-handle{width:38px;height:5px;background:var(--gray2);border-radius:3px;margin:9px auto 4px;opacity:.6;}
+  .sheet-collapsed{display:flex;flex-direction:column;gap:6px;padding:6px 16px 0;}
+  .cur-row{display:flex;gap:12px;align-items:center;}
+  .sheet.expanded .sheet-collapsed{display:none;}
+  .thumb{width:64px;height:64px;border-radius:16px;background:var(--paper-2);display:flex;align-items:center;justify-content:center;font-size:26px;flex:none;position:relative;overflow:hidden;}
+  .thumb.type-sight{background:rgba(212,72,32,.14);color:var(--accent);}
+  .thumb.type-meal{background:rgba(200,122,61,.16);color:var(--cat-meal);}
+  .thumb.type-stay{background:rgba(62,122,120,.16);color:var(--cat-stay);}
+  .thumb.type-transit{background:rgba(155,145,132,.16);color:var(--cat-transit);}
+  .cur-info{flex:1;min-width:0;}
+  .cur-info .name{font-weight:900;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .cur-info .meta{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .cur-info .countdown{font-size:12px;font-weight:800;color:var(--ink-soft);margin-top:2px;}
+  .cur-info .countdown.urgent{color:var(--accent);animation:pulse 1.2s infinite;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-left:6px;}
+  .badge.confirmed{background:#E3F1E6;color:var(--green);}
+  .badge.pending{background:#FBEAD3;color:var(--orange);}
+  .badge.optional{background:#EEE9E0;color:var(--gray2);}
+  .badge.skip{background:#EEE9E0;color:var(--gray2);text-decoration:line-through;}
+  .go-btn{background:var(--accent);color:#fff;border:none;border-radius:14px;padding:10px 16px;font-weight:900;font-size:13px;flex:none;
+    box-shadow:0 4px 14px rgba(212,72,32,.4);animation:pulse 1.8s infinite;cursor:pointer;}
+  @keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.05);}}
+
+  .sheet-list{display:none;padding:0 16px 16px;height:calc(100% - 40px);overflow-y:auto;}
+  .sheet.expanded .sheet-list{display:block;}
+  .variant-toggle{display:flex;gap:8px;margin:4px 0 12px;}
+  .variant-toggle button{flex:1;padding:8px;border-radius:12px;border:2px solid var(--paper-2);background:var(--paper-2);
+    font-weight:700;font-size:12px;color:var(--ink-soft);cursor:pointer;}
+  .variant-toggle button.active{background:var(--accent);color:#fff;border-color:var(--accent-dark);}
+  .note-banner{background:#FBEAD3;border-left:4px solid var(--orange);border-radius:8px;padding:8px 10px;font-size:12px;margin-bottom:10px;}
+  .note-banner.hard{background:#FBE0DC;border-left-color:var(--red);color:var(--red);font-weight:700;}
+  .event-row{display:flex;align-items:center;gap:10px;padding:9px 4px 9px 8px;border-bottom:1px solid var(--paper-2);border-left:3px solid transparent;cursor:pointer;}
+  .event-row .thumb-sm{width:38px;height:38px;border-radius:10px;background:var(--paper-2);display:flex;align-items:center;justify-content:center;font-size:16px;flex:none;}
+  .event-row .time{font-size:11px;color:var(--ink-soft);width:36px;flex:none;}
+  .event-row .et{flex:1;min-width:0;}
+  .event-row .et .t{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .event-row .et .n{font-size:11px;color:var(--ink-soft);}
+  .event-row.skipped .t{text-decoration:line-through;color:var(--gray2);}
+  .sheet-list .event-row.stagger{animation:rowIn .32s ease-out backwards;}
+  /* 行程分類：景點/餐廳/住宿為主卡片（淡底色 + 左側色條 + 圖示上色，卡片間用間距分開），
+     交通為中間縮小的虛線連接列，串在卡片之間 */
+  .event-row.type-sight,.event-row.type-meal,.event-row.type-stay{border-radius:12px;border-bottom:none;margin-bottom:3px;}
+  .event-row.type-sight{background:rgba(212,72,32,.05);border-left-color:var(--accent);}
+  .event-row.type-sight .thumb-sm{background:rgba(212,72,32,.14);color:var(--accent);}
+  .event-row.type-meal{background:rgba(200,122,61,.07);border-left-color:var(--cat-meal);}
+  .event-row.type-meal .thumb-sm{background:rgba(200,122,61,.16);color:var(--cat-meal);}
+  .event-row.type-stay{background:rgba(62,122,120,.16);border-left-color:var(--cat-stay);border-left-width:5px;}
+  .event-row.type-stay .thumb-sm{background:rgba(62,122,120,.26);color:var(--cat-stay);width:44px;height:44px;font-size:19px;}
+  .event-row.type-stay .et .t{color:var(--cat-stay);}
+  .event-row.type-transit{padding:3px 4px 3px 8px;border-left-style:dashed;border-left-color:var(--cat-transit);border-bottom:none;opacity:.8;}
+  .event-row.type-transit .thumb-sm{width:24px;height:24px;font-size:12px;border-radius:50%;background:transparent;color:var(--cat-transit);}
+  .event-row.type-transit .time{font-size:10px;width:32px;}
+  .event-row.type-transit .et .t{font-size:12px;font-weight:500;color:var(--ink-soft);}
+  @keyframes rowIn{from{opacity:0;transform:translateX(-10px);}to{opacity:1;transform:none;}}
+  .skip-btn{flex:none;width:26px;height:26px;border-radius:50%;border:none;background:var(--paper-2);color:var(--ink-soft);
+    font-size:12px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .skip-btn:active{background:#FBE0DC;color:var(--red);}
+  .v-chip{display:inline-flex;align-items:center;gap:8px;margin-top:5px;padding:5px 10px;border-radius:10px;
+    background:#FDF3E7;border:1.5px dashed var(--accent);font-family:ui-monospace,monospace;font-size:12px;font-weight:800;
+    color:var(--accent-dark);cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .v-chip span{background:var(--accent);color:#fff;border-radius:7px;padding:2px 7px;font-size:10px;font-family:'Noto Sans TC',sans-serif;flex:none;}
+
+  /* ---------- Modal / sheets ---------- */
+  .overlay-backdrop{position:fixed;inset:0;background:rgba(46,40,34,.45);z-index:700;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .overlay-backdrop.show{opacity:1;pointer-events:auto;}
+  .modal-sheet{position:fixed;left:0;right:0;bottom:0;z-index:800;background:var(--paper);border-radius:22px 22px 0 0;
+    box-shadow:0 -8px 30px rgba(46,40,34,.3);max-height:80%;overflow-y:auto;transform:translateY(100%);transition:transform .38s cubic-bezier(.32,1.3,.5,1);
+    padding-bottom:calc(env(safe-area-inset-bottom,0px) + 16px);}
+  .modal-sheet.show{transform:translateY(0);}
+  .modal-header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 6px;}
+  .modal-header h3{margin:0;font-size:17px;}
+  .modal-header button{background:none;border:none;font-size:20px;color:var(--ink-soft);cursor:pointer;}
+  .modal-body{padding:0 16px 16px;}
+  .hero{width:100%;aspect-ratio:16/9;background:var(--paper-2);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:48px;margin-bottom:12px;position:relative;overflow:hidden;}
+  .info-row{display:flex;gap:8px;font-size:13px;padding:6px 0;border-bottom:1px solid var(--paper-2);}
+  .info-row .k{color:var(--ink-soft);width:70px;flex:none;}
+  .event-note-banner{background:#FBEAD3;border-left:4px solid var(--orange);border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:10px;font-weight:700;}
+  .tag-row{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;}
+  .tag-chip{background:var(--paper-2);color:var(--ink-soft);font-size:11px;font-weight:700;padding:4px 10px;border-radius:10px;}
+  .tag-chip.child{background:#E3F1E6;color:var(--green);}
+  .place-summary{font-size:13px;line-height:1.6;color:var(--ink);margin:10px 0;}
+  .place-notes{margin:0 0 10px;padding-left:18px;font-size:13px;line-height:1.6;color:var(--ink-soft);}
+  .place-notes li{margin-bottom:4px;}
+  .btn-row{display:flex;gap:8px;margin-top:14px;}
+  .btn{flex:1;text-align:center;padding:11px;border-radius:12px;font-weight:700;font-size:13px;text-decoration:none;border:none;cursor:pointer;}
+  .btn.primary{background:var(--accent);color:#fff;}
+  .btn.ghost{background:var(--paper-2);color:var(--ink);}
+  .opt-btn{display:block;width:100%;text-align:left;padding:13px 14px;border-radius:12px;background:var(--paper-2);border:none;
+    font-size:14px;font-weight:700;margin-bottom:8px;cursor:pointer;}
+  .opt-btn.danger{color:var(--red);}
+  .step{display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed var(--paper-2);font-size:13px;align-items:flex-start;}
+  .step .ic{font-size:16px;}
+  .steps-summary{font-size:12px;font-weight:800;color:var(--accent-dark);background:var(--paper-2);border-radius:10px;padding:7px 10px;margin:8px 0 2px;}
+  .steps-tl .step{border-bottom:none;position:relative;padding:7px 0 7px 32px;display:block;}
+  .steps-tl .step .ic{position:absolute;left:0;top:7px;width:22px;text-align:center;}
+  .steps-tl .step:not(:last-child)::after{content:"";position:absolute;left:10px;top:30px;bottom:-6px;border-left:2px dotted var(--paper-2);}
+  .step-line{font-weight:800;font-size:13px;}
+  .step-route{font-size:13px;}
+  .step-meta{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .tag-transfer{font-size:10px;font-weight:800;color:#fff;background:var(--orange);border-radius:6px;padding:1px 5px;margin-left:6px;vertical-align:1px;}
+  .candidate-trains{background:var(--paper-2);border-radius:12px;padding:10px 12px;margin:8px 0;}
+  .candidate-trains .ct-title{font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;}
+  .candidate-trains .ct-row{display:flex;gap:8px;font-size:13px;padding:3px 0;align-items:baseline;}
+  .candidate-trains .ct-time{font-weight:900;color:var(--accent);width:44px;flex:none;}
+  .candidate-trains .ct-no{font-weight:700;width:64px;flex:none;}
+  .candidate-trains .ct-dest{color:var(--ink-soft);}
+  .candidate-trains .ct-note{font-size:11px;color:var(--orange);margin-top:6px;}
+  .shop-day{font-weight:900;font-size:13px;margin:14px 0 6px;color:var(--accent-dark);}
+  .shop-day:first-child{margin-top:0;}
+  .shop-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--paper-2);}
+  .shop-item input{width:18px;height:18px;flex:none;}
+  .shop-item input:checked{animation:pop .28s ease-out;}
+  @keyframes pop{0%{transform:scale(1);}50%{transform:scale(1.4) rotate(6deg);}100%{transform:scale(1);}}
+  .shop-item .si-name{flex:1;font-size:13px;transition:color .25s, opacity .25s;}
+  .shop-item.checked .si-name{text-decoration:line-through;color:var(--gray2);opacity:.55;}
+  .shop-item .stars{font-size:11px;color:var(--orange);flex:none;}
+  .shop-progress{font-size:12px;color:var(--ink-soft);margin-bottom:8px;}
+  .countdown-card{position:fixed;inset:0;z-index:900;background:var(--map-bg);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;}
+  .countdown-card .big{font-size:48px;font-weight:900;color:var(--accent);}
+  .leaflet-div-icon{background:none;border:none;}
+  .marker-pin{width:44px;height:44px;border-radius:50%;background:var(--paper);border:3px solid var(--accent);display:flex;align-items:center;justify-content:center;
+    font-size:20px;box-shadow:0 3px 10px rgba(0,0,0,.3);position:relative;}
+  .marker-pin.here{animation:float 2s ease-in-out infinite;border-color:var(--green);}
+  @keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}
+  .marker-drop{animation:drop .5s ease-out backwards;}
+  @keyframes drop{0%{transform:translateY(-16px) scale(.7);opacity:0;}60%{transform:translateY(3px) scale(1.03);opacity:1;}100%{transform:translateY(0) scale(1);}}
+  .route-line{animation:ant-march 1.4s linear infinite;}
+  @keyframes ant-march{to{stroke-dashoffset:-14;}}
+  .marker-badge{position:absolute;top:-6px;right:-6px;background:var(--accent);color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;
+    display:flex;align-items:center;justify-content:center;font-weight:900;}
+  .marker-dot{width:26px;height:26px;border-radius:50%;background:var(--paper);border:2px solid #A89F91;display:flex;align-items:center;justify-content:center;
+    font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,.25);position:relative;}
+  .marker-dot.here{border-color:var(--green);animation:float 2s ease-in-out infinite;}
+  .marker-dot .marker-badge{width:14px;height:14px;font-size:8px;top:-5px;right:-5px;background:#A89F91;}
+  .vehicle{font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));}
+  .pulse-ring{width:10px;height:10px;border-radius:50%;position:relative;}
+  .pulse-ring::before,.pulse-ring::after{content:"";position:absolute;inset:0;border-radius:50%;border:3px solid var(--accent);animation:ring 1.2s ease-out forwards;}
+  .pulse-ring::after{animation-delay:.3s;}
+  @keyframes ring{from{transform:scale(1);opacity:.9;}to{transform:scale(9);opacity:0;}}
+  #toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 74px);left:50%;transform:translate(-50%,-160%);z-index:850;background:#2E2822;color:#fff;
+    padding:10px 18px;border-radius:20px;font-size:13px;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.3);
+    transition:transform .4s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;max-width:88vw;overflow:hidden;text-overflow:ellipsis;}
+  #toast.show{transform:translate(-50%,0);}
+  #daySplash{position:fixed;inset:0;z-index:900;display:none;align-items:center;justify-content:center;flex-direction:column;
+    background:rgba(46,40,34,.55);backdrop-filter:blur(4px);pointer-events:none;}
+  #daySplash.show{display:flex;animation:splash 1.6s ease forwards;}
+  #bigCountdown{position:fixed;top:calc(env(safe-area-inset-top,0px) + 172px);left:0;right:0;margin:0 auto;width:fit-content;z-index:450;
+    background:var(--paper);border-radius:18px;box-shadow:0 6px 24px rgba(46,40,34,.28);padding:8px 22px 10px;text-align:center;
+    max-width:88vw;pointer-events:none;}
+  #bigCountdown .bc-label{font-size:12px;font-weight:800;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #bigCountdown .bc-time{font-size:36px;font-weight:900;line-height:1.1;color:var(--ink);font-variant-numeric:tabular-nums;}
+  #bigCountdown.urgent{background:var(--accent);animation:pulse 1.2s infinite;}
+  #bigCountdown.urgent .bc-label,#bigCountdown.urgent .bc-time{color:#fff;}
+  #daySplash .d{font-size:19px;color:#fff;opacity:.85;font-weight:700;letter-spacing:3px;}
+  #daySplash .t{font-size:30px;color:#fff;font-weight:900;margin-top:8px;text-align:center;padding:0 24px;}
+  @keyframes splash{0%{opacity:0;}12%{opacity:1;}75%{opacity:1;}100%{opacity:0;}}
+  .mk-img{position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);border-radius:50%;object-fit:cover;z-index:1;}
+  .marker-badge{z-index:2;}
+  .hero-img,.thumb-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .user-dot{width:16px;height:16px;border-radius:50%;background:#2A7BE4;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4);position:relative;}
+  .user-dot::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid #2A7BE4;opacity:.5;animation:ring 2s ease-out infinite;}
+  #alarmOverlay{position:fixed;inset:0;z-index:950;display:none;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(178,40,20,.93);color:#fff;text-align:center;padding:30px;}
+  #alarmOverlay.show{display:flex;}
+  #alarmOverlay .note{font-size:18px;font-weight:800;}
+  #alarmOverlay .cd{font-size:58px;font-weight:900;font-variant-numeric:tabular-nums;margin:12px 0;}
+  #alarmOverlay button{margin-top:22px;background:#fff;color:#B22814;border:none;border-radius:16px;padding:12px 28px;font-weight:900;font-size:15px;}
+  .voucher{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--paper-2);}
+  .voucher .v-info{flex:1;min-width:0;}
+  .voucher .v-name{font-size:13px;font-weight:800;}
+  .voucher .v-meta{font-size:11px;color:var(--ink-soft);margin-top:1px;}
+  .voucher .v-code{font-size:14px;font-weight:900;color:var(--accent);margin-top:3px;word-break:break-all;font-family:ui-monospace,monospace;}
+  .voucher .v-copy{flex:none;background:var(--paper-2);border:none;border-radius:12px;padding:8px 14px;font-weight:800;font-size:12px;color:var(--ink);cursor:pointer;}
+  .leaflet-popup-content{margin:10px 12px;font-family:'Noto Sans TC',sans-serif;}
+  .popup-name{font-weight:900;font-size:13px;}
+  .popup-time{font-size:11px;color:var(--ink-soft);margin:2px 0 6px;}
+  .popup-link{color:var(--accent);font-weight:700;font-size:12px;text-decoration:none;}
+  #authGate{position:fixed;inset:0;z-index:2000;display:none;flex-direction:column;align-items:center;justify-content:center;
+    background:var(--paper);padding:24px;text-align:center;}
+  #authGate.show{display:flex;}
+  #authGate .auth-card{max-width:320px;width:100%;}
+  #authGate .auth-title{font-size:20px;font-weight:900;color:var(--ink);margin-bottom:6px;}
+  #authGate .auth-sub{font-size:13px;color:var(--ink-soft);margin-bottom:18px;}
+  #authGate input{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1px solid var(--paper-2);font-size:14px;margin-bottom:10px;font-family:'Noto Sans TC',sans-serif;}
+  #authGate button{width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:900;font-size:14px;cursor:pointer;}
+  #authGate .auth-msg{margin-top:12px;font-size:12px;color:var(--ink-soft);min-height:16px;}
+  #authGate .auth-msg.error{color:var(--red);}
+</style>
+</head>
+<body>
+
+<div id="map" class="warm"></div>
+
+<div class="top-overlay">
+  <div class="status-bar">
+    <div>
+      <div class="title" id="statusTitle">東京家族旅行 2026</div>
+      <div class="sub" id="statusSub">爸爸・媽媽・5歲小孩</div>
+    </div>
+    <div class="clock" id="statusClock">--:--</div>
+  </div>
+  <div class="day-chips" id="dayChips"></div>
+</div>
+
+<button class="fab fab-compass" id="fabCompass" title="回到當前地點">🧭</button>
+<button class="fab fab-shop" id="fabShop" title="購物清單">🛍️</button>
+<button class="fab fab-ticket" id="fabTicket" title="憑證口袋">🎫</button>
+<button class="fab fab-locate" id="fabLocate" title="我的位置">📍</button>
+<button class="fab fab-sim" id="fabSim" title="模擬時間 +30分" style="display:none;">+30分</button>
+<button class="fab fab-simplay" id="fabSimPlay" title="自動流逝：點擊播放/暫停，長按切換倍速" style="display:none;">▶1x</button>
+<div id="toast"></div>
+<div id="daySplash"></div>
+<div id="bigCountdown" style="display:none;"></div>
+
+<div class="sheet" id="sheet">
+  <div class="sheet-handle" id="sheetHandle"></div>
+  <div class="sheet-collapsed" id="sheetCollapsed"></div>
+  <div class="sheet-list" id="sheetList"></div>
+</div>
+
+<div class="overlay-backdrop" id="backdrop"></div>
+
+<div class="modal-sheet" id="placeModal"></div>
+<div class="modal-sheet" id="routeModal"></div>
+<div class="modal-sheet" id="overrideModal"></div>
+<div class="modal-sheet" id="shopModal"></div>
+<div class="modal-sheet" id="voucherModal"></div>
+<div id="alarmOverlay"></div>
+
+<div id="authGate">
+  <div class="auth-card">
+    <div class="auth-title">東京家族旅行 2026</div>
+    <div class="auth-sub">輸入 email 收取登入連結，登入後即可查看完整行程</div>
+    <input id="authEmail" type="email" placeholder="you@example.com" autocomplete="email">
+    <button id="authSubmit">寄送登入連結</button>
+    <div class="auth-msg" id="authMsg"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* =========================================================
+   資料層 — 假資料模式：trip-data.json 全量嵌入
+   ========================================================= */
+let TRIP_DATA = null;
+
+const SUPABASE_URL = "https://hkfcgvwatsmjpookytqs.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrZmNndndhdHNtanBvb2t5dHFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMTAzMjAsImV4cCI6MjA5MDY4NjMyMH0.0ZljWZBD36SaqdT30rNtUETbLce260IuzN1xFJkMTRE";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function showAuthGate(show){
+  document.getElementById("authGate").classList.toggle("show", show);
+}
+function setAuthMsg(text, isError){
+  const el = document.getElementById("authMsg");
+  el.textContent = text;
+  el.classList.toggle("error", !!isError);
+}
+async function requestMagicLink(email){
+  setAuthMsg("寄送中…", false);
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.href.split("#")[0] }
+  });
+  if(error){ setAuthMsg("寄送失敗："+error.message, true); return; }
+  setAuthMsg("已寄出登入連結，請至信箱點擊連結", false);
+}
+async function fetchTripData(){
+  const { data, error } = await sb.from("trip_data").select("data").eq("id","main").single();
+  if(error || !data) return null;
+  return data.data;
+}
+function wireAuthForm(){
+  document.getElementById("authSubmit").onclick = ()=>{
+    const email = document.getElementById("authEmail").value.trim();
+    if(!email){ setAuthMsg("請輸入 email", true); return; }
+    requestMagicLink(email);
+  };
+}
+async function boot(){
+  wireAuthForm();
+  const { data: { session } } = await sb.auth.getSession();
+  if(!session){
+    showAuthGate(true);
+    return;
+  }
+  const tripData = await fetchTripData();
+  if(!tripData){
+    showAuthGate(true);
+    setAuthMsg("此帳號尚未被授權，請聯絡 Tony", true);
+    return;
+  }
+  TRIP_DATA = tripData;
+  VOUCHERS = tripData.vouchers || [];
+  showAuthGate(false);
+  startApp();
+}
+
+const DAY0 = {
+  day:0, date:"2026-09-17", weekday:"木", theme:"出發前準備",
+  accommodation:null,
+  events:[
+    {time:"20:00", title:"行李打包確認", type:"logistics", note:"護照、機票、轉接頭、常備藥"},
+    {time:"22:00", title:"提早就寢", type:"rest", note:"隔天 06:35 飛機，需早起"}
+  ]
+};
+
+const DAY_NOTES = {
+  5:"富津生態屋私有道路無路燈，16:30前抵達",
+  6:"沖之島潮間帶，出發前確認潮汐",
+  7:"天外天晚餐需預約（9月待開放）",
+  8:"曼珠沙華花況出發前確認",
+  10:"⚠️ 15:30 出發 / 16:45 還車 / 18:00 check-in"
+};
+
+const WEATHER_BACKUP = {
+  1:"大井賽馬場為半露天，雨天仍可入場",
+  2:"中華街、合味道紀念館為室內，雨天可行",
+  3:"teamLab Planets、Small Worlds 皆為室內",
+  4:"哈利波特影城全室內",
+  5:"鋸山纜車遇雨可跳過，改延長保田小學探索時間",
+  6:"館山城為室內展示，雨天可行；沖之島潮間帶雨天改散步",
+  7:"渡輪遇強風可能停航，建議事先確認",
+  8:"巾著田下雨仍可賞花；西武獅為室內 Belluna 巨蛋",
+  9:"鐵道博物館全室內，雨天沒問題",
+  10:"新勝寺表參道屋外，雨天帶傘仍可逛"
+};
+
+const SHOPPING = [
+  {day:2, area:"橫濱", items:[
+    {key:"y-shumai", name:"崎陽軒 シウマイ（燒賣）", stars:3, place:"桜木町站・橫濱站內", note:"橫濱第一名物；冷凍版可帶回台灣"},
+    {key:"y-ariake", name:"ありあけ ハーバー 洋菓子", stars:2, place:"みなとみらい 商場", note:"橫濱老字號禮盒"},
+    {key:"y-tea", name:"中華街茶葉/零食", stars:1, place:"橫濱中華街", note:"快速掃一圈即可"},
+  ]},
+  {day:3, area:"台場・有明", items:[
+    {key:"o-gunpla", name:"鋼彈模型（Gunpla）", stars:3, place:"DiverCity GUNDAM SQUARE", note:"現場限定款優先"},
+    {key:"o-teamlab", name:"teamLab 周邊", stars:2, place:"teamLab Planets 出口商店", note:"僅現場販售"},
+  ]},
+  {day:4, area:"哈利波特影城", items:[
+    {key:"h-wand", name:"魔杖（Wand）", stars:3, place:"影城商店", note:"小孩最愛，可選角色款"},
+    {key:"h-frog", name:"巧克力蛙", stars:3, place:"影城商店", note:"附收藏卡"},
+    {key:"h-cookie", name:"限定餅乾禮盒", stars:2, place:"影城出口商店", note:"送禮首選"},
+    {key:"h-beer", name:"奶油啤酒（瓶裝）", stars:2, place:"影城商店", note:"瓶裝版可帶走"},
+  ]},
+  {day:5, area:"房總・保田", items:[
+    {key:"b-peanut", name:"千葉花生（落花生）", stars:3, place:"道の駅 鋸南保田", note:"千葉名物第一"},
+    {key:"b-nori", name:"千葉產海苔", stars:2, place:"道の駅 鋸南保田", note:"房總半島海苔質優"},
+    {key:"b-fish", name:"地魚乾", stars:1, place:"館山 渚の食堂周邊", note:"小包裝零食"},
+  ]},
+  {day:8, area:"埼玉・所澤", items:[
+    {key:"s-tea", name:"狭山茶", stars:2, place:"所澤周邊茶舖", note:"日本三大銘茶之一"},
+    {key:"s-manju", name:"十万石まんじゅう", stars:2, place:"所澤駅周邊", note:"埼玉代表性和菓子"},
+  ]},
+  {day:9, area:"大宮・佐原（主力採買日）", items:[
+    {key:"r-toy", name:"新幹線造型玩具/文具", stars:3, place:"鐵道博物館商店", note:"小孩必買"},
+    {key:"r-bento", name:"鐵道便當盒", stars:3, place:"鐵道博物館商店", note:"可愛實用"},
+    {key:"r-soy", name:"佐原醬油", stars:3, place:"正上醤油／佐原老街", note:"選防漏包裝，帶1-2瓶"},
+    {key:"r-cookie", name:"新幹線餅乾禮盒", stars:2, place:"鐵道博物館商店", note:"大宮限定款"},
+    {key:"r-miso", name:"佐原味噌", stars:2, place:"老街沿途", note:"小包裝方便帶"},
+    {key:"r-tenugui", name:"萬祝染手帕", stars:1, place:"佐原老街手工藝店", note:"輕薄好帶"},
+  ]},
+  {day:10, area:"成田山新勝寺", items:[
+    {key:"n-yokan", name:"羊羹", stars:3, place:"表參道 駿河屋等各店", note:"選個別包裝方便分送"},
+    {key:"n-ningyoyaki", name:"人形燒", stars:3, place:"表參道現做攤位", note:"現做熱吃最好"},
+    {key:"n-omamori", name:"交通安全護身符", stars:2, place:"本堂周邊", note:"自駕旅行應景"},
+    {key:"n-unagi", name:"鰻魚蒲燒醬汁", stars:1, place:"鰻魚老店周邊", note:""},
+  ]},
+];
+
+const TYPE_ICON = {
+  attraction:"🎡", meal:"🍜", transport:"🚃", logistics:"🧳", checkin:"🛏️",
+  activity:"🎢", sports:"⚾", free:"🚶", rest:"😴", shopping:"🛍️", waypoint:"✈️"
+};
+// 行程分類：景點/餐廳/住宿/物流走主卡片樣式，純交通移動走縮小連接列樣式
+// （logistics 如 ecbo cloak、取車、還車是有地點的停留點，不是移動過程本身，不應歸類 transit）
+function catOf(type){
+  if(type==="meal") return "meal";
+  if(type==="checkin") return "stay";
+  if(type==="transport") return "transit";
+  return "sight";
+}
+
+/* =========================================================
+   Mock Sync 層 — 之後接 Supabase 只要換掉這個物件的實作
+   對外介面：get(table), set(table, key, value), subscribe(cb) 保持一致
+   ========================================================= */
+const MockSync = {
+  _ns: "tokyo-trip-mock-v1",
+  _read(){ try{ return JSON.parse(localStorage.getItem(this._ns)) || {}; }catch(e){ return {}; } },
+  _write(data){ localStorage.setItem(this._ns, JSON.stringify(data)); this._listeners.forEach(fn=>fn()); },
+  _listeners: [],
+  subscribe(fn){ this._listeners.push(fn); },
+  getSetting(key, fallback){ const d=this._read(); return (d.settings && d.settings[key]) ?? fallback; },
+  setSetting(key, value){ const d=this._read(); d.settings=d.settings||{}; d.settings[key]=value; this._write(d); },
+  getOverrides(){ const d=this._read(); return d.overrides || {}; },
+  setOverride(dayNum, eventIndex, override){
+    const d=this._read(); d.overrides=d.overrides||{};
+    const k=dayNum+"-"+eventIndex;
+    if(override===null) delete d.overrides[k]; else d.overrides[k]=override;
+    this._write(d);
+  },
+  getShopping(){ const d=this._read(); return d.shopping || {}; },
+  setShopping(itemKey, checked){ const d=this._read(); d.shopping=d.shopping||{}; d.shopping[itemKey]=checked; this._write(d); },
+};
+
+/* =========================================================
+   TimeEngine
+   ========================================================= */
+function pad(n){ return String(n).padStart(2,"0"); }
+let SIM_ACTIVE = false;
+let simOffsetMin = 0;
+/* 時區模型：行程時間都是「當地時間」——桃園出發是台灣時間(+8)，其餘皆日本時間(+9)。
+   內部一律用絕對時間(epoch)計算，牆鐘顯示用 JST。台灣座標(lat<30)的事件視為 +8。 */
+function nowEpoch(){
+  return SIM_ACTIVE
+    ? new Date(TRIP_DATA.trip.dates.start+"T00:00:00+09:00").getTime() + simOffsetMin*60000
+    : Date.now();
+}
+function simNow(){ return new Date(nowEpoch() + 9*3600000); }  // JST 牆鐘，用 getUTC* 讀取
+function advanceSim(min){ simOffsetMin += min; renderAll(); }
+/* ---- 時間自動流逝（測試用）：每秒推進 N 個模擬分鐘，N 可切換倍速 ---- */
+const SIM_SPEEDS = [1, 5, 15, 60];
+let simSpeedIdx = 1, simAutoTimer = null;
+function updateSimPlayBtn(){
+  const btn = document.getElementById("fabSimPlay");
+  btn.textContent = (simAutoTimer ? "⏸" : "▶") + SIM_SPEEDS[simSpeedIdx] + "x";
+  btn.classList.toggle("playing", !!simAutoTimer);
+}
+function toggleSimPlay(){
+  if(simAutoTimer){ clearInterval(simAutoTimer); simAutoTimer=null; }
+  else{ simAutoTimer = setInterval(()=>advanceSim(SIM_SPEEDS[simSpeedIdx]), 1000); }
+  updateSimPlayBtn();
+}
+function cycleSimSpeed(){
+  simSpeedIdx = (simSpeedIdx+1) % SIM_SPEEDS.length;
+  updateSimPlayBtn();
+}
+function stopSimPlay(){
+  if(simAutoTimer){ clearInterval(simAutoTimer); simAutoTimer=null; }
+  updateSimPlayBtn();
+}
+function toggleSim(){
+  SIM_ACTIVE = !SIM_ACTIVE;
+  simOffsetMin = 0;
+  stopSimPlay();
+  document.getElementById("fabSim").style.display = SIM_ACTIVE ? "flex" : "none";
+  document.getElementById("fabSimPlay").style.display = SIM_ACTIVE ? "flex" : "none";
+  autoFollowToday = true;
+  renderAll();
+}
+function todayStr(){ const d=simNow(); return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate()); }
+function nowHM(){ const d=simNow(); return pad(d.getUTCHours())+":"+pad(d.getUTCMinutes()); }
+function minutesUntil(hm){
+  const [h,m] = hm.split(":").map(Number);
+  const d = simNow();
+  return h*60+m - (d.getUTCHours()*60+d.getUTCMinutes());
+}
+function hmToMin(hm){ const [h,m] = hm.split(":").map(Number); return h*60+m; }
+function eventTz(e){ return (e.coord && e.coord[0] < 30) ? "+08:00" : "+09:00"; }
+function eventEpoch(dayObj, e){ return new Date(dayObj.date+"T"+e.time+":00"+eventTz(e)).getTime(); }
+function minutesUntilEv(dayObj, e){ return Math.round((eventEpoch(dayObj, e) - nowEpoch())/60000); }
+
+/* ---- 天氣（Open-Meteo，免 API key；失敗時靜默略過） ---- */
+let weatherState = null;
+function weatherEmoji(code){
+  if(code===0) return "☀️";
+  if(code<=2) return "🌤";
+  if(code===3) return "☁️";
+  if(code<=48) return "🌫";
+  if(code<=67) return "🌧";
+  if(code<=77) return "🌨";
+  if(code<=82) return "🌧";
+  return "⛈";
+}
+async function loadWeather(){
+  try{
+    const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=35.68&longitude=139.75&daily=weathercode,precipitation_probability_max&timezone=Asia%2FTokyo&forecast_days=1");
+    const j = await r.json();
+    weatherState = {code:j.daily.weathercode[0], rain:j.daily.precipitation_probability_max[0]};
+  }catch(err){ weatherState = null; }
+  renderStatus();
+  renderSheet();
+}
+
+function getAllDays(){ return [DAY0, ...TRIP_DATA.days]; }
+
+function getDayEvents(dayObj){
+  if(!dayObj.events_common) return dayObj.events || [];
+  const variant = MockSync.getSetting("day2_variant","A");
+  return [...dayObj.events_common, ...(variant==="A"? dayObj.events_variantA : dayObj.events_variantB)];
+}
+
+function getCurrentTripDay(){
+  const t = todayStr();
+  const found = getAllDays().find(d=>d.date===t);
+  return found ? found.day : null;
+}
+
+function eventsWithOverrides(dayNum, events){
+  const ov = MockSync.getOverrides();
+  return events.map((e,i)=>{
+    const o = ov[dayNum+"-"+i];
+    return {...e, _idx:i, override:o||null};
+  });
+}
+
+function getCurrentAndNextEvent(dayObj){
+  const events = eventsWithOverrides(dayObj.day, getDayEvents(dayObj));
+  const active = events.filter(e=> !(e.override && e.override.status==="skip"));
+  const now = nowHM();
+  let current=null, next=null, nextNext=null;
+  for(let i=0;i<active.length;i++){
+    if(active[i].time <= now){ current = active[i]; }
+    else if(!next){ next = active[i]; }
+    else { nextNext = active[i]; break; }
+  }
+  // heading = 「前往下一站」模式：當前行程的停留時間已結束（有 duration），
+  // 或（無 duration 時）本身就是一個時間點事件（如出發/起飛）→ 立即視為在途中，
+  // 讓交通工具依「current.time → next.time」的完整區間逐步推進，而非等到快到才動
+  let heading = false;
+  if(current && next){
+    const elapsed = -minutesUntil(current.time);
+    heading = current.duration != null ? elapsed >= current.duration : true;
+  }
+  return {current, next, nextNext, heading, all: events};
+}
+
+/* =========================================================
+   State
+   ========================================================= */
+let selectedDayNum = getCurrentTripDay() ?? 1;
+let autoFollowToday = true;
+let map, markersLayer, polyline;
+let lastFocusedKey = null;
+let lastFitDay = null;
+let passedLine = null;
+let staggerPending = true;
+
+/* =========================================================
+   渲染：StatusBar / DayChips
+   ========================================================= */
+function renderStatus(){
+  document.getElementById("statusClock").textContent = nowHM() + (SIM_ACTIVE ? " 🧪" : "");
+  const tripStart = new Date(TRIP_DATA.trip.dates.start+"T00:00:00");
+  const tripEnd = new Date(TRIP_DATA.trip.dates.end+"T23:59:59");
+  const now = simNow();
+  const sub = document.getElementById("statusSub");
+  if(now < tripStart){
+    const days = Math.ceil((tripStart-now)/86400000);
+    sub.textContent = `倒數 ${days} 天出發`;
+  } else if(now > tripEnd){
+    sub.textContent = "旅途結束，點擊回顧";
+  } else {
+    const d = getCurrentTripDay();
+    sub.textContent = d ? `Day ${d}・${getAllDays().find(x=>x.day===d).theme}` : "旅行期間";
+  }
+  if(weatherState){
+    sub.textContent += ` ・ ${weatherEmoji(weatherState.code)}${weatherState.rain>=30?` ☔${weatherState.rain}%`:""}`;
+  }
+  checkHardDeadlines();
+  liveVehicleTick();
+  bigCountdownTick();
+}
+
+function bigCountdownTick(){
+  const el = document.getElementById("bigCountdown");
+  const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
+  if(!dayObj || dayObj.date !== todayStr()){ el.style.display="none"; return; }
+  const {next, heading} = getCurrentAndNextEvent(dayObj);
+  if(!next){ el.style.display="none"; return; }
+  const now = simNow();
+  const diff = hmToMin(next.time)*60 - (now.getUTCHours()*3600 + now.getUTCMinutes()*60 + now.getUTCSeconds());
+  if(diff <= 0){ el.style.display="none"; return; }
+  const h = Math.floor(diff/3600), m = Math.floor(diff%3600/60), s = diff%60;
+  const timeStr = h>0 ? `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}` : `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  const place = next.place ? TRIP_DATA.places[next.place] : null;
+  el.innerHTML = `<div class="bc-label">${MODE_EMOJI[next.mode]||"⏳"} ${heading?"前往":"下一站"} ${place?.name || next.title} ・ ${next.time}</div><div class="bc-time">${timeStr}</div>`;
+  el.classList.toggle("urgent", diff <= 900);
+  el.style.display = "block";
+}
+
+function renderDayChips(){
+  const el = document.getElementById("dayChips");
+  el.innerHTML = "";
+  getAllDays().forEach(d=>{
+    const chip = document.createElement("div");
+    chip.className = "chip" + (d.day===selectedDayNum ? " active":"");
+    chip.innerHTML = `D${d.day}<span class="d">${d.date.slice(5).replace('-','/')}</span>`;
+    chip.onclick = ()=>{ selectedDayNum=d.day; autoFollowToday=false; staggerPending=true; renderAll(); };
+    el.appendChild(chip);
+  });
+}
+
+/* =========================================================
+   渲染：Map
+   ========================================================= */
+function initMap(){
+  map = L.map("map", {zoomControl:false, attributionControl:false}).setView([35.68,139.75], 9);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {maxZoom:19}).addTo(map);
+  markersLayer = L.layerGroup().addTo(map);
+}
+
+function placeCoord(placeKey){
+  const p = TRIP_DATA.places[placeKey];
+  return p ? p.coordinates : null;
+}
+
+function eventCoord(e){
+  if(e.coord) return e.coord;
+  if(e.place){ const c = placeCoord(e.place); if(c) return [c.lat, c.lng]; }
+  return null;
+}
+
+/* ---- 圖片管線：真照片（assets/places/{key}.jpg）與 Q版 marker（assets/markers/{key}.png），缺圖自動退回 emoji ---- */
+const imgFailed = new Set();
+function imgFail(el, key){ imgFailed.add(key); el.remove(); }
+function placePhoto(key, cls){
+  return (key && !imgFailed.has("p:"+key)) ? `<img class="${cls}" src="assets/places/${key}.jpg" onerror="imgFail(this,'p:${key}')">` : "";
+}
+function markerArt(key){
+  return (key && !imgFailed.has("m:"+key)) ? `<img class="mk-img" src="assets/markers/${key}.png" onerror="imgFail(this,'m:${key}')">` : "";
+}
+
+function makeIcon(emoji, isHere, badgeNum, dropDelay, minor, placeKey){
+  const cls = minor ? "marker-dot" : "marker-pin";
+  const pin = `<div class="${cls} ${isHere?'here':''}">${emoji}${minor?"":markerArt(placeKey)}${badgeNum?`<span class="marker-badge">${badgeNum}</span>`:""}</div>`;
+  return L.divIcon({
+    className:"leaflet-div-icon",
+    html: dropDelay!=null ? `<div class="marker-drop" style="animation-delay:${dropDelay}ms">${pin}</div>` : pin,
+    iconSize: minor?[26,26]:[44,44],
+    iconAnchor: minor?[13,13]:[22,44],
+    popupAnchor: minor?[0,-14]:[0,-40]
+  });
+}
+
+function renderMap(dayObj, currentEvent){
+  markersLayer.clearLayers();
+  if(polyline){ map.removeLayer(polyline); polyline=null; }
+  if(passedLine){ map.removeLayer(passedLine); passedLine=null; }
+  const dayChanged = lastFitDay !== dayObj.day;
+  const events = eventsWithOverrides(dayObj.day, getDayEvents(dayObj)).filter(e=> !(e.override && e.override.status==="skip"));
+  const pts = [];
+  let hereIdx = -1;
+  events.forEach((e)=>{
+    const ll = eventCoord(e);
+    if(!ll) return;
+    const isHere = currentEvent && currentEvent._idx===e._idx;
+    if(isHere) hereIdx = pts.length;
+    const seq = pts.length + 1;
+    pts.push(ll);
+    const minor = !e.place;
+    const marker = L.marker(ll, {icon: makeIcon(TYPE_ICON[e.type]||"📍", isHere, seq, dayChanged ? seq*70 : null, minor, e.place)}).addTo(markersLayer);
+    const place = e.place ? TRIP_DATA.places[e.place] : null;
+    marker.bindPopup(`
+      <div class="popup-name">${place?.name || e.title}</div>
+      <div class="popup-time">${e.time} ・ ${e.title}</div>
+      ${e.place ? `<a class="popup-link" href="javascript:void(0)" onclick="openPlaceModal('${e.place}','${e.title.replace(/'/g,"\\'")}','${e.time}')">查看詳情 →</a>` : ""}
+    `);
+  });
+  if(pts.length>1){
+    const split = hereIdx>=0 ? hereIdx : 0;
+    const passed = pts.slice(0, split+1);
+    const future = pts.slice(split);
+    if(passed.length>1) passedLine = L.polyline(passed, {color:"#A89F91", weight:3, opacity:.5}).addTo(map);
+    if(future.length>1) polyline = L.polyline(future, {color:"#D44820", weight:3, dashArray:"6,8", opacity:.8, className:"route-line"}).addTo(map);
+  }
+  if(pts.length && dayChanged){
+    map.fitBounds(pts.length>1?pts:[pts[0], pts[0]], {paddingTopLeft:[20,100], paddingBottomRight:[20,230], maxZoom:15});
+    lastFitDay = dayObj.day;
+  }
+}
+
+function focusCurrent(){
+  const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
+  const {current} = getCurrentAndNextEvent(dayObj);
+  if(current){
+    const ll = eventCoord(current);
+    if(ll) map.setView(ll, 15, {animate:true});
+  }
+}
+
+/* =========================================================
+   渲染：BottomSheet
+   ========================================================= */
+function statusBadge(e){
+  if(e.override && e.override.status==="skip") return `<span class="badge skip">已跳過</span>`;
+  if(e.override && e.override.status==="delay") return `<span class="badge pending">延後</span>`;
+  if(e.status==="confirmed") return `<span class="badge confirmed">已確認</span>`;
+  if(e.status==="pending") return `<span class="badge pending">待確認</span>`;
+  if(e.optional) return `<span class="badge optional">可選</span>`;
+  return "";
+}
+
+function renderSheet(){
+  const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
+  const {current, next, nextNext, heading, all} = getCurrentAndNextEvent(dayObj);
+
+  // heading 模式：主卡片提前顯示下一站，預告列表只剩下下站
+  const focusEvent = heading ? next : current;
+  const upcoming = (heading ? [nextNext] : [next, nextNext]).filter(Boolean);
+  const upcomingHtml = upcoming.length ? `<div class="upcoming-list">${upcoming.map(e=>{
+    const place = e.place ? TRIP_DATA.places[e.place] : null;
+    const cat = catOf(e.type);
+    const icon = cat==="transit" ? (MODE_EMOJI[e.mode] || TYPE_ICON[e.type] || "📍") : (TYPE_ICON[e.type]||"📍");
+    return `<div class="event-row type-${cat}" onclick="handleEventTap(${e._idx})">
+      <div class="time">${e.time}</div>
+      <div class="thumb-sm">${icon}</div>
+      <div class="et"><div class="t">${place?.name || e.title}</div></div>
+      <button class="skip-btn" onclick="event.stopPropagation();openOverrideModal(${e._idx})" title="調整此行程">✕</button>
+    </div>`;
+  }).join("")}</div>` : "";
+
+  // collapsed
+  const mins = next ? minutesUntil(next.time) : null;
+  const cdHtml = (mins!=null && mins>0)
+    ? `<div class="countdown ${mins<=15?'urgent':''}">⏳ ${heading?"距開始":"下一站"} ${mins>=60 ? Math.floor(mins/60)+" 小時 "+(mins%60)+" 分" : mins+" 分"}${heading?"":"後"}</div>`
+    : "";
+  const collapsed = document.getElementById("sheetCollapsed");
+  if(focusEvent){
+    const place = focusEvent.place ? TRIP_DATA.places[focusEvent.place] : null;
+    const modeChip = heading ? `<span class="badge pending">${MODE_EMOJI[focusEvent.mode]||"🧭"} 前往下一站</span>` : `<span class="badge confirmed">現在</span>`;
+    let voucher = findVoucher(dayObj.day, focusEvent), vAhead = false;
+    if(!(voucher && voucher.code!=="待確認") && next){
+      const nv = findVoucher(dayObj.day, next);
+      if(nv && nv.code!=="待確認"){ voucher = nv; vAhead = true; }
+    }
+    const vChipHtml = (voucher && voucher.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${voucher.code}')">🎫 ${vAhead?"下一站 ":""}${voucher.code}<span>複製</span></div>` : "";
+    collapsed.innerHTML = `
+      <div class="cur-row">
+        <div class="thumb type-${catOf(focusEvent.type)}">${TYPE_ICON[focusEvent.type]||"📍"}${placePhoto(focusEvent.place,"thumb-img")}</div>
+        <div class="cur-info">
+          <div class="name">${place?.name || focusEvent.title}</div>
+          <div class="meta">${focusEvent.time} ${modeChip} ${statusBadge(focusEvent)}</div>
+          ${cdHtml}
+          ${vChipHtml}
+        </div>
+        ${eventCoord(focusEvent) ? `<button class="go-btn" onclick="openRouteModal(${focusEvent._idx})">GO →</button>` : ""}
+      </div>
+      ${upcomingHtml}
+    `;
+  } else {
+    const place = next?.place ? TRIP_DATA.places[next.place] : null;
+    const nv = next ? findVoucher(dayObj.day, next) : null;
+    const nvHtml = (nv && nv.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${nv.code}')">🎫 ${nv.code}<span>複製</span></div>` : "";
+    collapsed.innerHTML = `<div class="cur-info"><div class="name">今日行程尚未開始</div>${next ? `<div class="meta">${next.time} ${place?.name || next.title}</div>` : ""}${cdHtml}${nvHtml}</div>`;
+  }
+
+  // expanded list
+  const list = document.getElementById("sheetList");
+  let html = "";
+  if(dayObj.events_common){
+    const variant = MockSync.getSetting("day2_variant","A");
+    html += `<div class="variant-toggle">
+      <button class="${variant==='A'?'active':''}" onclick="setVariant('A')">⚾ 棒球版</button>
+      <button class="${variant==='B'?'active':''}" onclick="setVariant('B')">🚡 纜車版</button>
+    </div>`;
+  }
+  if(weatherState && weatherState.rain>=50 && WEATHER_BACKUP[dayObj.day] && dayObj.day===getCurrentTripDay()){
+    html += `<div class="note-banner">☔ 今日降雨機率 ${weatherState.rain}% — ${WEATHER_BACKUP[dayObj.day]}</div>`;
+  }
+  if(DAY_NOTES[dayObj.day]){
+    html += `<div class="note-banner ${dayObj.day===10?'hard':''}">${DAY_NOTES[dayObj.day]}</div>`;
+  }
+  if(dayObj.hardDeadlines){
+    dayObj.hardDeadlines.forEach(hd=>{
+      html += `<div class="note-banner hard">⚠️ ${hd.time} — ${hd.note}</div>`;
+    });
+  }
+  let prevEvent = null;
+  all.forEach((e,i)=>{
+    html += transitConnectorHtml(prevEvent, e, dayObj);
+    const place = e.place ? TRIP_DATA.places[e.place] : null;
+    const skipped = e.override && e.override.status==="skip";
+    const cat = catOf(e.type);
+    const icon = cat==="transit" ? (MODE_EMOJI[e.mode] || TYPE_ICON[e.type] || "📍") : (TYPE_ICON[e.type]||"📍");
+    // 交通/物流列一律顯示事件自己的標題（例如「ecbo cloak 行李寄放」），不要被連結的
+    // place 名稱蓋掉——否則「去HOSTEL LUND寄放行李」會被誤讀成「入住HOSTEL LUND」
+    const label = (cat==="transit" || e.type==="logistics") ? e.title : (place?.name || e.title);
+    html += `<div class="event-row type-${cat} ${skipped?'skipped':''} ${staggerPending?'stagger':''}"${staggerPending?` style="animation-delay:${i*35}ms"`:""} onclick="handleEventTap(${e._idx})" ontouchstart="startLongPress(${e._idx})" ontouchend="cancelLongPress()" onmousedown="startLongPress(${e._idx})" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()">
+      <div class="time">${e.time}</div>
+      <div class="thumb-sm">${icon}</div>
+      <div class="et">
+        <div class="t">${label} ${statusBadge(e)}</div>
+        <div class="n">${e.note||""}</div>
+      </div>
+    </div>`;
+    prevEvent = e;
+  });
+  list.innerHTML = html;
+  staggerPending = false;
+}
+
+function setVariant(v){ staggerPending=true; MockSync.setSetting("day2_variant", v); renderAll(); }
+
+function handleEventTap(idx){
+  if(sheetLongPressFired) { sheetLongPressFired=false; return; }
+  const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
+  const events = eventsWithOverrides(dayObj.day, getDayEvents(dayObj));
+  const e = events[idx];
+  if(e.place) openPlaceModal(e.place, e.title, e.time, e.note, e.duration);
+  else if(catOf(e.type)==="transit") openRouteModal(idx);
+}
+
+let longPressTimer=null, sheetLongPressFired=false;
+function startLongPress(idx){
+  longPressTimer = setTimeout(()=>{ sheetLongPressFired=true; openOverrideModal(idx); }, 500);
+}
+function cancelLongPress(){ clearTimeout(longPressTimer); }
+
+/* ---- sheet drag/expand ---- */
+function initSheetDrag(){
+  const sheet = document.getElementById("sheet");
+  const handle = document.getElementById("sheetHandle");
+  let startY=0, dragging=false;
+  const expandWithStagger = ()=>{ staggerPending=true; renderSheet(); };
+  const toggle = ()=>{
+    const willExpand = !sheet.classList.contains("expanded");
+    sheet.classList.toggle("expanded");
+    if(willExpand) expandWithStagger();
+  };
+  handle.addEventListener("click", toggle);
+  document.getElementById("sheetCollapsed").addEventListener("click", (ev)=>{
+    if(ev.target.closest(".go-btn") || ev.target.closest(".event-row") || ev.target.closest(".v-chip")) return;
+    toggle();
+  });
+  handle.addEventListener("touchstart", e=>{ startY=e.touches[0].clientY; dragging=true; });
+  handle.addEventListener("touchend", e=>{
+    if(!dragging) return; dragging=false;
+    const dy = e.changedTouches[0].clientY - startY;
+    if(dy < -20 && !sheet.classList.contains("expanded")){ sheet.classList.add("expanded"); expandWithStagger(); }
+    if(dy > 20) sheet.classList.remove("expanded");
+  });
+}
+
+/* =========================================================
+   Modals
+   ========================================================= */
+function showModal(id){
+  document.getElementById("backdrop").classList.add("show");
+  document.getElementById(id).classList.add("show");
+}
+function hideModals(){
+  document.getElementById("backdrop").classList.remove("show");
+  ["placeModal","routeModal","overrideModal","shopModal","voucherModal"].forEach(id=>document.getElementById(id).classList.remove("show"));
+}
+document.getElementById("backdrop").onclick = hideModals;
+
+function mapsUrl(lat,lng,name){
+  return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}(${encodeURIComponent(name)})`;
+}
+
+function formatDurationMin(min){
+  if(min==null) return "";
+  if(min<60) return `${min}分鐘`;
+  const h = Math.floor(min/60), m = min%60;
+  return m ? `${h}小時${m}分` : `${h}小時`;
+}
+function openPlaceModal(placeKey, fallbackTitle, time, eventNote, eventDuration){
+  const p = TRIP_DATA.places[placeKey];
+  const el = document.getElementById("placeModal");
+  const eventNoteHtml = eventNote ? `<div class="event-note-banner">📌 這次行程的備註：${eventNote}</div>` : "";
+  if(!p){
+    el.innerHTML = `<div class="modal-header"><h3>${fallbackTitle}</h3><button onclick="hideModals()">✕</button></div>
+      <div class="modal-body">
+        ${eventNoteHtml}
+        <div class="info-row"><div class="k">時間</div><div>${time||""}</div></div>
+      </div>`;
+    showModal("placeModal"); return;
+  }
+  const priceStr = p.price ? Object.entries(p.price).map(([k,v])=>`${k}: ¥${v}`).join(" / ") : "";
+  const tagsHtml = (p.tags && p.tags.length) ? `<div class="tag-row">${p.tags.map(t=>`<span class="tag-chip">${t}</span>`).join("")}${p.childFriendly?`<span class="tag-chip child">👨‍👩‍👧 適合親子</span>`:""}</div>` : (p.childFriendly?`<div class="tag-row"><span class="tag-chip child">👨‍👩‍👧 適合親子</span></div>`:"");
+  el.innerHTML = `
+    <div class="modal-header"><h3>${p.name}</h3><button onclick="hideModals()">✕</button></div>
+    <div class="modal-body">
+      ${eventNoteHtml}
+      ${eventDuration!=null?`<div class="info-row"><div class="k">預計停留</div><div>約 ${formatDurationMin(eventDuration)}</div></div>`:""}
+      <div class="hero">${TYPE_ICON[p.type]||"📍"}${placePhoto(placeKey,"hero-img")}</div>
+      ${p.nameJa?`<div class="info-row"><div class="k">日文名</div><div>${p.nameJa}</div></div>`:""}
+      <div class="info-row"><div class="k">地址</div><div>${p.address||"—"}</div></div>
+      <div class="info-row"><div class="k">最近車站</div><div>${p.nearestStation||"—"}</div></div>
+      ${p.hours?`<div class="info-row"><div class="k">開放時間</div><div>${p.hours}</div></div>`:""}
+      ${priceStr?`<div class="info-row"><div class="k">價格</div><div>${priceStr}</div></div>`:""}
+      ${p.status?`<div class="info-row"><div class="k">狀態</div><div>${statusBadge({status:p.status})||p.status}</div></div>`:""}
+      ${p.reservation?`<div class="info-row"><div class="k">確認碼</div><div onclick="copyText('${p.reservation}')" style="text-decoration:underline;cursor:pointer;">${p.reservation}（點擊複製）</div></div>`:""}
+      ${tagsHtml}
+      ${p.summary?`<div class="place-summary">${p.summary}</div>`:""}
+      ${(p.notes && p.notes.length)?`<ul class="place-notes">${p.notes.map(n=>`<li>${n}</li>`).join("")}</ul>`:""}
+      <div class="btn-row">
+        <a class="btn ghost" target="_blank" href="${mapsUrl(p.coordinates.lat,p.coordinates.lng,p.name)}">在 Google Maps 查看</a>
+        <a class="btn primary" target="_blank" href="${mapsUrl(p.coordinates.lat,p.coordinates.lng,p.name)}&travelmode=transit">導航</a>
+      </div>
+    </div>`;
+  showModal("placeModal");
+}
+function copyText(t){ navigator.clipboard?.writeText(t); }
+
+function stepIcon(text){
+  if(text.includes("步行")) return "🚶";
+  if(text.includes("計程車")) return "🚕";
+  if(text.includes("渡輪")) return "⛴️";
+  if(text.includes("自駕")||text.includes("開車")) return "🚗";
+  if(text.includes("電車")||text.includes("JR")||text.includes("線")||text.includes("新幹線")) return "🚃";
+  return "📍";
+}
+
+// 結構化 step：{mode, line?, from?, to?, min?, fare?, note?}；字串格式向下相容（icon 用關鍵字猜）
+function stepHtml(s, i, arr){
+  if(typeof s === "string") return `<div class="step"><span class="ic">${stepIcon(s)}</span><div>${s}</div></div>`;
+  const icon = MODE_EMOJI[s.mode] || "📍";
+  const prev = i>0 ? arr[i-1] : null;
+  const transfer = prev && typeof prev==="object" && s.mode==="train" && prev.mode==="train";
+  const route = (s.from||s.to) ? `${s.from||""}${s.from&&s.to?" → ":"→ "}${s.to||""}` : "";
+  const meta = [s.min?`約${s.min}分`:null, s.fare?`¥${s.fare.toLocaleString()}/人`:null, s.note].filter(Boolean).join("・");
+  return `<div class="step"><span class="ic">${icon}</span><div>
+    ${s.line?`<div class="step-line">${s.line}${transfer?`<span class="tag-transfer">轉乘</span>`:""}</div>`:""}
+    ${route?`<div class="step-route">${route}</div>`:""}
+    ${meta?`<div class="step-meta">${meta}</div>`:""}
+  </div></div>`;
+}
+
+function openRouteModal(idx){
+  const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
+  const events = eventsWithOverrides(dayObj.day, getDayEvents(dayObj));
+  const e = events[idx];
+  const fromEv = idx>0 ? events[idx-1] : null;
+  const p = e.place ? TRIP_DATA.places[e.place] : null;
+  const el = document.getElementById("routeModal");
+  const modeInfo = (e.mode && fromEv) ? transitDetail(fromEv, e, dayObj) : null;
+  // 有結構化 steps 時線路資訊已在 steps 裡，泛用的 mode 列會重複，略過（班機無 steps 不受影響）
+  const hasStructuredSteps = !!(e.steps && e.steps.some(s=>typeof s==="object"));
+  const modeHtml = (modeInfo && !hasStructuredSteps) ? `<div class="step"><span class="ic">${MODE_EMOJI[e.mode]||"🧭"}</span><div><b>${modeInfo.label}</b>${modeInfo.note?`<br>${modeInfo.note}`:""}</div></div>` : "";
+  const candidatesHtml = (e.candidateTrains && e.candidateTrains.length) ? `
+    <div class="candidate-trains">
+      <div class="ct-title">🚃 候選班次（研究整理，非即時保證）</div>
+      ${e.candidateTrains.map(t=>`<div class="ct-row"><span class="ct-time">${t.time}</span><span class="ct-no">${t.no}</span><span class="ct-dest">${t.dest}</span></div>`).join("")}
+      ${e.candidateTrainsNote ? `<div class="ct-note">⚠️ ${e.candidateTrainsNote}</div>` : ""}
+    </div>` : "";
+  // 沒 steps 時不 fallback 到 e.note——那是地點本身的備註，不是交通說明（同 transitDetail 原則）
+  let stepsHtml = "";
+  if(e.steps && e.steps.length){
+    stepsHtml = `<div class="steps-tl">${e.steps.map(stepHtml).join("")}</div>`;
+    const objs = e.steps.filter(s=>typeof s==="object");
+    const mins = objs.reduce((sum,s)=>sum+(s.min||0),0);
+    const fares = objs.reduce((sum,s)=>sum+(s.fare||0),0);
+    const parts = [];
+    if(mins) parts.push(`全程約${mins}分`);
+    if(fares) parts.push(`車資約¥${fares.toLocaleString()}/人`);
+    if(parts.length) stepsHtml = `<div class="steps-summary">${parts.join("・")}</div>` + stepsHtml;
+  } else {
+    stepsHtml = `<div class="step"><span class="ic">📍</span><div>請自行導航至 ${p?p.name:e.title}</div></div>`;
+  }
+  const weatherHtml = WEATHER_BACKUP[dayObj.day] ? `<div class="note-banner">⛅ ${WEATHER_BACKUP[dayObj.day]}</div>` : "";
+  const rv = findVoucher(dayObj.day, e);
+  const voucherHtml = (rv && rv.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${rv.code}')" style="margin-bottom:8px;">🎫 ${rv.code}<span>複製</span></div>` : "";
+  const ll = eventCoord(e);
+  el.innerHTML = `
+    <div class="modal-header"><h3>怎麼到下一站</h3><button onclick="hideModals()">✕</button></div>
+    <div class="modal-body">
+      <div style="font-weight:900;font-size:15px;margin-bottom:8px;">${fromEv?`<span style="font-weight:700;color:var(--ink-soft);">${fromEv.title} → </span>`:""}${p?p.name:e.title}</div>
+      ${voucherHtml}
+      ${weatherHtml}
+      ${modeHtml}
+      ${candidatesHtml}
+      ${stepsHtml}
+      ${ll ? `<div class="btn-row"><a class="btn primary" target="_blank" href="${mapsUrl(ll[0],ll[1],p?p.name:e.title)}">在 Google Maps 導航（含即時班次）</a></div>` : ""}
+    </div>`;
+  showModal("routeModal");
+}
+
+function openOverrideModal(idx){
+  const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
+  const events = eventsWithOverrides(dayObj.day, getDayEvents(dayObj));
+  const e = events[idx];
+  const el = document.getElementById("overrideModal");
+  el.innerHTML = `
+    <div class="modal-header"><h3>${e.title}</h3><button onclick="hideModals()">✕</button></div>
+    <div class="modal-body">
+      <button class="opt-btn danger" onclick="setOverride(${dayObj.day},${idx},{status:'skip'})">跳過這個</button>
+      <button class="opt-btn" onclick="setOverride(${dayObj.day},${idx},{status:'delay'})">稍後再說</button>
+      <button class="opt-btn" onclick="setOverride(${dayObj.day},${idx},null)">取消所有異動</button>
+    </div>`;
+  showModal("overrideModal");
+}
+function setOverride(day, idx, override){
+  MockSync.setOverride(day, idx, override);
+  hideModals();
+  renderAll();
+}
+
+function openShopModal(){
+  const checked = MockSync.getShopping();
+  const total = SHOPPING.reduce((s,g)=>s+g.items.length,0);
+  const done = Object.values(checked).filter(Boolean).length;
+  const el = document.getElementById("shopModal");
+  let html = `<div class="modal-header"><h3>伴手禮清單</h3><button onclick="hideModals()">✕</button></div>
+    <div class="modal-body"><div class="shop-progress">已買 ${done} / 共 ${total} 項</div>`;
+  SHOPPING.forEach(g=>{
+    html += `<div class="shop-day">Day ${g.day} — ${g.area}</div>`;
+    g.items.forEach(it=>{
+      const isChecked = !!checked[it.key];
+      html += `<div class="shop-item ${isChecked?'checked':''}">
+        <input type="checkbox" ${isChecked?"checked":""} onchange="toggleShop('${it.key}',this.checked,this)">
+        <div class="si-name">${it.name}<br><span style="font-size:11px;color:var(--ink-soft);">${it.place}</span></div>
+        <div class="stars">${"★".repeat(it.stars)}</div>
+      </div>`;
+    });
+  });
+  html += `</div>`;
+  el.innerHTML = html;
+  showModal("shopModal");
+}
+function toggleShop(key, checked, inputEl){
+  MockSync.setShopping(key, checked);
+  if(inputEl){
+    inputEl.closest(".shop-item").classList.toggle("checked", checked);
+    const prog = document.querySelector("#shopModal .shop-progress");
+    if(prog){
+      const done = Object.values(MockSync.getShopping()).filter(Boolean).length;
+      const total = SHOPPING.reduce((s,g)=>s+g.items.length,0);
+      prog.textContent = `已買 ${done} / 共 ${total} 項`;
+    }
+  }
+}
+
+/* =========================================================
+   Init
+   ========================================================= */
+/* ---- 全螢幕動畫：換日過場 / 交通工具移動 / 抵達光圈 / 頂部橫幅 ---- */
+let lastSplashDay = null, prevFocusLL = null, lastFocusDay = null;
+let toastTimer = null;
+
+function showDaySplash(dayObj){
+  const el = document.getElementById("daySplash");
+  el.innerHTML = `<div class="d">DAY ${dayObj.day}・${dayObj.date.slice(5).replace("-","/")}</div><div class="t">${dayObj.theme||""}</div>`;
+  el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
+  setTimeout(()=>el.classList.remove("show"), 1700);
+}
+
+function showToast(msg){
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.classList.remove("show"), 2600);
+}
+
+function arrivalPulse(ll){
+  const icon = L.divIcon({className:"leaflet-div-icon", html:`<div class="pulse-ring"></div>`, iconSize:[10,10], iconAnchor:[5,5]});
+  const m = L.marker(ll, {icon, zIndexOffset:900, interactive:false}).addTo(map);
+  setTimeout(()=>map.removeLayer(m), 1400);
+}
+
+const MODE_EMOJI = {plane:"✈️", train:"🚃", taxi:"🚕", walk:"🚶", ferry:"⛴️", car:"🚗", bus:"🚌", gondola:"🚡"};
+const MODE_LABEL = {plane:"飛機", train:"電車", taxi:"計程車", walk:"步行", ferry:"渡輪", car:"開車", bus:"巴士", gondola:"纜車"};
+// 班機事件配對 TRIP_DATA.trip.flights，補上航班號、起訖航廈與時間
+function flightDetailFor(e, dayObj){
+  if(e.mode!=="plane") return null;
+  const fl = TRIP_DATA.trip.flights;
+  return [fl.outbound, fl.return].find(f=>f && f.departure.startsWith(dayObj.date)) || null;
+}
+// 交通方式的詳細資訊：班機用航班資料庫（時間差用 eventEpoch 正確跨時區計算），
+// 其餘用事件自帶的 transitNote——不能 fallback 到 e.note，那是抵達地點本身的備註
+// （餐廳/景點資訊），混用會讓交通說明顯示文不對題的內容。
+// 沒有 transitNote 來源時寧可不顯示時間，也不用「班表格差」瞎猜（含入住/休息等
+// 事件的行程間隔常常包含大量停留時間，不是真正的移動時間，硬算會誤導）。
+function transitDetail(fromEv, toEv, dayObj){
+  const f = flightDetailFor(toEv, dayObj);
+  if(f){
+    const min = fromEv ? Math.round((eventEpoch(dayObj, toEv) - eventEpoch(dayObj, fromEv))/60000) : null;
+    const durTxt = (min && min>0) ? `，飛行約${Math.floor(min/60)}小時${min%60}分` : "";
+    return {label: `${TRIP_DATA.trip.flights.airline} ${f.flightNo}`, note: `${f.from} ${f.fromTerminal} ${f.departure.slice(11)} → ${f.to} ${f.toTerminal} ${f.arrival.slice(11)}${durTxt}`};
+  }
+  return {label: MODE_LABEL[toEv.mode] || toEv.mode, note: toEv.transitNote || ""};
+}
+// 兩張主卡片（景點/餐廳/住宿）之間若沒有獨立的交通事件，就補一列縮小的交通方式連接列，
+// 用抵達事件既有的 mode 欄位呈現，避免景點與景點之間看起來憑空移動；點擊可看詳細乘車資訊
+function transitConnectorHtml(fromEv, toEv, dayObj){
+  if(!fromEv || !toEv || !toEv.mode) return "";
+  if(catOf(fromEv.type)==="transit" || catOf(toEv.type)==="transit") return "";
+  const icon = MODE_EMOJI[toEv.mode] || "🧭";
+  const {label, note} = transitDetail(fromEv, toEv, dayObj);
+  return `<div class="event-row type-transit synth-connector" onclick="openRouteModal(${toEv._idx})">
+    <div class="time"></div>
+    <div class="thumb-sm">${icon}</div>
+    <div class="et"><div class="t">${label}</div>${note?`<div class="n">${note}</div>`:""}</div>
+  </div>`;
+}
+
+function distKm(a, b){
+  const dLat = (b[0]-a[0]) * 111;
+  const dLng = (b[1]-a[1]) * 111 * Math.cos(a[0] * Math.PI/180);
+  return Math.sqrt(dLat*dLat + dLng*dLng);
+}
+
+/* ---- 真實路線（OSRM/FOSSGIS 免費伺服器）＋依時間百分比前進的即時交通工具 ----
+   car/taxi/bus/walk 走真實道路路線；train/plane/ferry/gondola 維持直線。
+   進度 = (現在 − 出發時刻) / (抵達時刻 − 出發時刻)，出發時刻 = 當前行程結束時間
+   （若當前行程本身就是時間點事件如起飛/出發，出發時刻即為該事件時間，非事後回推）。 ---- */
+const ROUTE_PROFILE = {
+  car:"routed-car/route/v1/driving", taxi:"routed-car/route/v1/driving",
+  bus:"routed-car/route/v1/driving", walk:"routed-foot/route/v1/foot"
+};
+async function fetchRealRoute(from, to, mode){
+  const prof = ROUTE_PROFILE[mode];
+  if(!prof) return [from, to];
+  const ck = `route:${mode}:${from[0].toFixed(4)},${from[1].toFixed(4)}-${to[0].toFixed(4)},${to[1].toFixed(4)}`;
+  try{ const hit = localStorage.getItem(ck); if(hit) return JSON.parse(hit); }catch(err){}
+  try{
+    const r = await fetch(`https://routing.openstreetmap.de/${prof}/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`);
+    const j = await r.json();
+    const pts = j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
+    try{ localStorage.setItem(ck, JSON.stringify(pts)); }catch(err){}
+    return pts;
+  }catch(err){ return [from, to]; }
+}
+
+function pointAlongRoute(pts, frac){
+  if(!pts || pts.length<2) return pts ? pts[0] : null;
+  const segs=[]; let total=0;
+  for(let i=1;i<pts.length;i++){ const d=distKm(pts[i-1],pts[i]); segs.push(d); total+=d; }
+  if(total===0) return pts[0];
+  let target = frac*total;
+  for(let i=0;i<segs.length;i++){
+    if(target<=segs[i]){
+      const t = segs[i] ? target/segs[i] : 0;
+      const a=pts[i], b=pts[i+1];
+      return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t];
+    }
+    target -= segs[i];
+  }
+  return pts[pts.length-1];
+}
+
+let liveKey=null, livePts=null, liveLine=null, liveVeh=null, livePulsed=false;
+function clearLive(){
+  if(liveLine){ map.removeLayer(liveLine); liveLine=null; }
+  if(liveVeh){ map.removeLayer(liveVeh); liveVeh=null; }
+  liveKey=null; livePts=null; livePulsed=false;
+}
+function liveVehicleTick(){
+  const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
+  if(!dayObj || dayObj.date !== todayStr()){ if(liveKey) clearLive(); return; }
+  const {current, next, heading} = getCurrentAndNextEvent(dayObj);
+  if(!heading){ if(liveKey) clearLive(); return; }
+  const from = eventCoord(current), to = eventCoord(next);
+  if(!from || !to){ if(liveKey) clearLive(); return; }
+  const key = dayObj.day+"-"+current._idx+"-"+next._idx;
+  if(liveKey !== key){
+    clearLive();
+    liveKey = key;
+    fetchRealRoute(from, to, next.mode).then(pts=>{
+      if(liveKey !== key) return;
+      livePts = pts;
+      liveLine = L.polyline(pts, {color:"#B23A18", weight:4, opacity:.85}).addTo(map);
+    });
+  }
+  const now = simNow();
+  const nowMin = now.getUTCHours()*60 + now.getUTCMinutes() + now.getUTCSeconds()/60;
+  const depMin = current.duration != null ? hmToMin(current.time)+current.duration : hmToMin(current.time);
+  const arrMin = hmToMin(next.time);
+  const frac = Math.max(0, Math.min(1, (nowMin-depMin) / Math.max(1, arrMin-depMin)));
+  const pos = pointAlongRoute(livePts || [from, to], frac);
+  if(!pos) return;
+  const emoji = MODE_EMOJI[next.mode] || (dayObj.day>=5 ? "🚗" : "🚃");
+  if(!liveVeh){
+    const icon = L.divIcon({className:"leaflet-div-icon", html:`<div class="vehicle">${emoji}</div>`, iconSize:[34,34], iconAnchor:[17,17]});
+    liveVeh = L.marker(pos, {icon, zIndexOffset:1100, interactive:false}).addTo(map);
+  } else liveVeh.setLatLng(pos);
+  if(frac>=1 && !livePulsed){ livePulsed=true; arrivalPulse(to); }
+}
+
+function focusOnCurrentChange(dayObj, current, next, heading){
+  // heading 模式：停留時間結束就提前聚焦下一站；尚未開始時聚焦第一站
+  const target = heading ? next : (current || next);
+  if(!target) return;
+  const key = dayObj.day+"-"+target._idx+"-"+(heading?"h":"c");
+  if(key === lastFocusedKey) return;
+  const ll = eventCoord(target);
+  if(!ll){ lastFocusedKey = key; return; }
+  const firstFocus = lastFocusedKey === null;
+  const sameDay = lastFocusDay === dayObj.day;
+  lastFocusedKey = key;
+  lastFocusDay = dayObj.day;
+  if(sameDay && !firstFocus){
+    // 長途移動（飛機/跨區）在途中時，鏡頭涵蓋「這一段」實際的出發→抵達兩點，
+    // 才看得到交通工具依比例前進；用 prevFocusLL（上一次鏡頭落點，可能與本段無關）
+    // 當作起點會在切換到不相干的新目標時，誤把鏡頭拉去涵蓋兩個不相干的點。
+    const legFromLL = heading ? eventCoord(current) : null;
+    const km = legFromLL ? distKm(legFromLL, ll) : (prevFocusLL ? distKm(prevFocusLL, ll) : 0);
+    if(legFromLL && km > 20){
+      map.flyToBounds([legFromLL, ll], {padding:[40,40], maxZoom:12, duration: Math.min(2.6, 1.2 + km/300)});
+    } else {
+      map.flyTo(ll, 15, {duration: Math.min(2.6, 1.2 + km/80)});
+    }
+    if(current && prevFocusLL && (prevFocusLL[0]!==ll[0] || prevFocusLL[1]!==ll[1])){
+      const emoji = MODE_EMOJI[target.mode] || (dayObj.day>=5 ? "🚗" : "🚃");
+      const place = target.place ? TRIP_DATA.places[target.place] : null;
+      showToast(`${emoji} 前往：${place?.name || target.title}`);
+    } else if(!heading && current){
+      const v = findVoucher(dayObj.day, current);
+      if(v && v.code!=="待確認") showToast(`🎫 ${v.name} 憑證：${v.code}`);
+    }
+  } else {
+    // 換日/初載：先讓 fitBounds 總覽在 splash 期間停一拍，再俯衝到目標站
+    const guard = key;
+    setTimeout(()=>{ if(lastFocusedKey === guard) map.flyTo(ll, 14, {duration:1.6}); }, 1300);
+  }
+  prevFocusLL = ll;
+}
+
+function renderAll(){
+  if(autoFollowToday){
+    const todayNum = getCurrentTripDay();
+    if(todayNum) selectedDayNum = todayNum;
+  }
+  renderStatus();
+  renderDayChips();
+  const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
+  if(lastSplashDay !== dayObj.day){
+    lastSplashDay = dayObj.day;
+    showDaySplash(dayObj);
+  }
+  const {current, next, heading} = getCurrentAndNextEvent(dayObj);
+  renderMap(dayObj, current);
+  focusOnCurrentChange(dayObj, current, next, heading);
+  renderSheet();
+}
+
+MockSync.subscribe(()=>{ renderAll(); });
+
+/* ---- 憑證口袋 ---- */
+// 內容來自 Supabase 的 TRIP_DATA.vouchers，登入取得資料後才會填入（見 boot()）——
+// 不能寫死在這裡，這裡面是訂位確認碼等敏感資訊。
+let VOUCHERS = [];
+function findVoucher(dayNum, e){
+  if(!e) return null;
+  return VOUCHERS.find(v =>
+    (v.place && e.place && v.place === e.place) ||
+    (v.at && v.at.some(([d,t]) => d === dayNum && t === e.time))
+  ) || null;
+}
+function openVoucherModal(){
+  const el = document.getElementById("voucherModal");
+  el.innerHTML = `<div class="modal-header"><h3>🎫 憑證口袋</h3><button onclick="hideModals()">✕</button></div>
+    <div class="modal-body">${VOUCHERS.map(v=>`
+      <div class="voucher">
+        <div class="v-info">
+          <div class="v-name">${v.name}</div>
+          <div class="v-meta">${v.date}${v.note?` ・ ${v.note}`:""}</div>
+          <div class="v-code">${v.code}</div>
+        </div>
+        ${v.code!=="待確認"?`<button class="v-copy" onclick="copyVoucher('${v.code}')">複製</button>`:""}
+      </div>`).join("")}</div>`;
+  showModal("voucherModal");
+}
+function copyVoucher(c){ navigator.clipboard?.writeText(c); showToast("✅ 已複製 "+c); }
+
+/* ---- GPS 藍點 ---- */
+let userMarker=null, userCircle=null, userLL=null;
+function initGeo(){
+  if(!("geolocation" in navigator)) return;
+  navigator.geolocation.watchPosition(pos=>{
+    userLL = [pos.coords.latitude, pos.coords.longitude];
+    const acc = pos.coords.accuracy || 30;
+    if(!userMarker){
+      const icon = L.divIcon({className:"leaflet-div-icon", html:`<div class="user-dot"></div>`, iconSize:[16,16], iconAnchor:[8,8]});
+      userMarker = L.marker(userLL, {icon, zIndexOffset:1200, interactive:false}).addTo(map);
+      userCircle = L.circle(userLL, {radius:acc, color:"#2A7BE4", weight:1, opacity:.4, fillOpacity:.08, interactive:false}).addTo(map);
+    } else {
+      userMarker.setLatLng(userLL);
+      userCircle.setLatLng(userLL); userCircle.setRadius(acc);
+    }
+  }, ()=>{}, {enableHighAccuracy:true, maximumAge:15000});
+}
+
+/* ---- 硬性時限紅色警報（前20分鐘全螢幕倒數） ---- */
+const ackedAlarms = new Set();
+function checkHardDeadlines(){
+  const el = document.getElementById("alarmOverlay");
+  const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
+  if(!dayObj || !dayObj.hardDeadlines || dayObj.date !== todayStr()){ el.classList.remove("show"); return; }
+  const now = simNow();
+  const nowSec = now.getUTCHours()*3600 + now.getUTCMinutes()*60 + now.getUTCSeconds();
+  for(const hd of dayObj.hardDeadlines){
+    const [h,m] = hd.time.split(":").map(Number);
+    const diff = h*3600 + m*60 - nowSec;
+    const key = dayObj.day+"-"+hd.time;
+    if(diff>0 && diff<=1200 && !ackedAlarms.has(key)){
+      const mm = String(Math.floor(diff/60)).padStart(2,"0"), ss = String(diff%60).padStart(2,"0");
+      el.innerHTML = `<div class="note">⚠️ ${hd.time} — ${hd.note}</div><div class="cd">${mm}:${ss}</div><button onclick="ackAlarm('${key}')">知道了</button>`;
+      el.classList.add("show");
+      return;
+    }
+  }
+  el.classList.remove("show");
+}
+function ackAlarm(key){ ackedAlarms.add(key); document.getElementById("alarmOverlay").classList.remove("show"); }
+
+function startApp(){
+  document.getElementById("fabCompass").onclick = focusCurrent;
+  document.getElementById("fabShop").onclick = openShopModal;
+  document.getElementById("fabTicket").onclick = openVoucherModal;
+  document.getElementById("fabLocate").onclick = ()=>{
+    if(userLL) map.flyTo(userLL, 16, {duration:.8});
+    else showToast("尚未取得定位（請允許定位權限）");
+  };
+  document.getElementById("fabSim").onclick = ()=>advanceSim(30);
+
+  let simPlayPressTimer=null, simPlayLongPressFired=false;
+  const fabSimPlay = document.getElementById("fabSimPlay");
+  function startSimPlayPress(){ simPlayLongPressFired=false; simPlayPressTimer=setTimeout(()=>{ simPlayLongPressFired=true; cycleSimSpeed(); }, 600); }
+  function cancelSimPlayPress(){ clearTimeout(simPlayPressTimer); }
+  fabSimPlay.addEventListener("touchstart", startSimPlayPress);
+  fabSimPlay.addEventListener("touchend", cancelSimPlayPress);
+  fabSimPlay.addEventListener("mousedown", startSimPlayPress);
+  fabSimPlay.addEventListener("mouseup", cancelSimPlayPress);
+  fabSimPlay.onclick = ()=>{ if(simPlayLongPressFired){ simPlayLongPressFired=false; return; } toggleSimPlay(); };
+  initGeo();
+
+  let clockPressTimer=null;
+  const clockEl = document.getElementById("statusClock");
+  clockEl.addEventListener("touchstart", ()=>{ clockPressTimer=setTimeout(toggleSim, 800); });
+  clockEl.addEventListener("touchend", ()=>clearTimeout(clockPressTimer));
+  clockEl.addEventListener("mousedown", ()=>{ clockPressTimer=setTimeout(toggleSim, 800); });
+  clockEl.addEventListener("mouseup", ()=>clearTimeout(clockPressTimer));
+
+  initMap();
+  initSheetDrag();
+  renderAll();
+  loadWeather();
+  setInterval(renderStatus, 1000);
+  setInterval(renderAll, 30000);
+  setInterval(loadWeather, 3600000);
+
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  }
+}
+
+boot();
+</script>
+</body>
+</html>
