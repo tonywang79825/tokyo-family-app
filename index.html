@@ -312,7 +312,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* =========================================================
-   資料層 — 假資料模式：trip-data.json 全量嵌入
+   資料層 — 登入後從 Supabase 的 trip_data 表整包取回，見下方 boot()
    ========================================================= */
 let TRIP_DATA = null;
 
@@ -347,7 +347,6 @@ async function signInWithFamilyPassword(password){
 }
 async function fetchTripData(){
   const { data, error } = await sb.from("trip_data").select("data").eq("id","main").single();
-  if(error){ console.error("[debug] fetchTripData error:", error); }
   if(error || !data) return null;
   return data.data;
 }
@@ -588,7 +587,9 @@ function eventsWithOverrides(dayNum, events){
 function getCurrentAndNextEvent(dayObj){
   const events = eventsWithOverrides(dayObj.day, getDayEvents(dayObj));
   const active = events.filter(e=> !(e.override && e.override.status==="skip"));
-  const now = nowHM();
+  // 只有「今天」才用實際時鐘去算「現在進行到哪」；不是今天（不管未來或過去）
+  // 一律當作還沒開始，停在當天第一個行程，不要用今天的時鐘時間去比對別的日期。
+  const now = dayObj.date===todayStr() ? nowHM() : "00:00";
   let current=null, next=null, nextNext=null;
   for(let i=0;i<active.length;i++){
     if(active[i].time <= now){ current = active[i]; }
@@ -825,7 +826,8 @@ function renderSheet(){
     const place = next?.place ? TRIP_DATA.places[next.place] : null;
     const nv = next ? findVoucher(dayObj.day, next) : null;
     const nvHtml = (nv && nv.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${nv.code}')">🎫 ${nv.code}<span>複製</span></div>` : "";
-    collapsed.innerHTML = `<div class="cur-info"><div class="name">今日行程尚未開始</div>${next ? `<div class="meta">${next.time} ${place?.name || next.title}</div>` : ""}${cdHtml}${nvHtml}</div>`;
+    const notStartedLabel = dayObj.date===todayStr() ? "今日行程尚未開始" : "行程尚未開始";
+    collapsed.innerHTML = `<div class="cur-info"><div class="name">${notStartedLabel}</div>${next ? `<div class="meta">${next.time} ${place?.name || next.title}</div>` : ""}${cdHtml}${nvHtml}</div>`;
   }
 
   // expanded list
