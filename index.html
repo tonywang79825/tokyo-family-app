@@ -339,6 +339,7 @@ async function requestMagicLink(email){
 }
 async function fetchTripData(){
   const { data, error } = await sb.from("trip_data").select("data").eq("id","main").single();
+  if(error){ console.error("[debug] fetchTripData error:", error); }
   if(error || !data) return null;
   return data.data;
 }
