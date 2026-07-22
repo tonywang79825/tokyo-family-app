@@ -600,7 +600,9 @@ function getCurrentAndNextEvent(dayObj){
 /* =========================================================
    State
    ========================================================= */
-let selectedDayNum = getCurrentTripDay() ?? 1;
+// 初值先給 1，TRIP_DATA 在 boot() 拿到資料前是 null，getCurrentTripDay() 會噴錯；
+// 真正的值在 startApp() 一開始（TRIP_DATA 已確定有資料）才重新計算。
+let selectedDayNum = 1;
 let autoFollowToday = true;
 let map, markersLayer, polyline;
 let lastFocusedKey = null;
@@ -1298,7 +1300,7 @@ function renderAll(){
   renderSheet();
 }
 
-MockSync.subscribe(()=>{ renderAll(); });
+MockSync.subscribe(()=>{ if(TRIP_DATA) renderAll(); });
 
 /* ---- 憑證口袋 ---- */
 // 內容來自 Supabase 的 TRIP_DATA.vouchers，登入取得資料後才會填入（見 boot()）——
@@ -1369,6 +1371,7 @@ function checkHardDeadlines(){
 function ackAlarm(key){ ackedAlarms.add(key); document.getElementById("alarmOverlay").classList.remove("show"); }
 
 function startApp(){
+  selectedDayNum = getCurrentTripDay() ?? 1;
   document.getElementById("fabCompass").onclick = focusCurrent;
   document.getElementById("fabShop").onclick = openShopModal;
   document.getElementById("fabTicket").onclick = openVoucherModal;
