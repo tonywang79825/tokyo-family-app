@@ -301,9 +301,9 @@
 <div id="authGate">
   <div class="auth-card">
     <div class="auth-title">東京家族旅行 2026</div>
-    <div class="auth-sub">輸入 email 收取登入連結，登入後即可查看完整行程</div>
-    <input id="authEmail" type="email" placeholder="you@example.com" autocomplete="email">
-    <button id="authSubmit">寄送登入連結</button>
+    <div class="auth-sub">輸入密碼查看完整行程</div>
+    <input id="authPassword" type="password" placeholder="密碼" autocomplete="current-password">
+    <button id="authSubmit">登入</button>
     <div class="auth-msg" id="authMsg"></div>
   </div>
 </div>
@@ -319,6 +319,9 @@ let TRIP_DATA = null;
 const SUPABASE_URL = "https://hkfcgvwatsmjpookytqs.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrZmNndndhdHNtanBvb2t5dHFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMTAzMjAsImV4cCI6MjA5MDY4NjMyMH0.0ZljWZBD36SaqdT30rNtUETbLce260IuzN1xFJkMTRE";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// 家人只需要輸入密碼，這個 email 是背後固定用來對應 Supabase Auth 帳號的技術細節，
+// 不會顯示在畫面上；這個帳號的 email 本身也已經在 allowed_emails 白名單裡。
+const FAMILY_ACCOUNT_EMAIL = "tony798252003@hotmail.com";
 
 function showAuthGate(show){
   document.getElementById("authGate").classList.toggle("show", show);
@@ -328,14 +331,19 @@ function setAuthMsg(text, isError){
   el.textContent = text;
   el.classList.toggle("error", !!isError);
 }
-async function requestMagicLink(email){
-  setAuthMsg("寄送中…", false);
-  const { error } = await sb.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: window.location.href.split("#")[0] }
-  });
-  if(error){ setAuthMsg("寄送失敗："+error.message, true); return; }
-  setAuthMsg("已寄出登入連結，請至信箱點擊連結", false);
+async function signInWithFamilyPassword(password){
+  setAuthMsg("登入中…", false);
+  const { error } = await sb.auth.signInWithPassword({ email: FAMILY_ACCOUNT_EMAIL, password });
+  if(error){ setAuthMsg("密碼錯誤或登入失敗，請再試一次", true); return; }
+  const tripData = await fetchTripData();
+  if(!tripData){
+    setAuthMsg("此帳號尚未被授權，請聯絡 Tony", true);
+    return;
+  }
+  TRIP_DATA = tripData;
+  VOUCHERS = tripData.vouchers || [];
+  showAuthGate(false);
+  startApp();
 }
 async function fetchTripData(){
   const { data, error } = await sb.from("trip_data").select("data").eq("id","main").single();
@@ -345,9 +353,9 @@ async function fetchTripData(){
 }
 function wireAuthForm(){
   document.getElementById("authSubmit").onclick = ()=>{
-    const email = document.getElementById("authEmail").value.trim();
-    if(!email){ setAuthMsg("請輸入 email", true); return; }
-    requestMagicLink(email);
+    const password = document.getElementById("authPassword").value;
+    if(!password){ setAuthMsg("請輸入密碼", true); return; }
+    signInWithFamilyPassword(password);
   };
 }
 async function boot(){
