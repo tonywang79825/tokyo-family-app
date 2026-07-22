@@ -321,7 +321,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // 家人只需要輸入密碼，這個 email 是背後固定用來對應 Supabase Auth 帳號的技術細節，
 // 不會顯示在畫面上；這個帳號的 email 本身也已經在 allowed_emails 白名單裡。
-const FAMILY_ACCOUNT_EMAIL = "tony798252003@hotmail.com";
+const FAMILY_ACCOUNT_EMAIL = "tokyo-family-2026@example.com";
 
 function showAuthGate(show){
   document.getElementById("authGate").classList.toggle("show", show);
