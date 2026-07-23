@@ -695,11 +695,11 @@ function eventCoord(e){
   return null;
 }
 
-/* ---- 圖片管線：真照片（assets/places/{key}.jpg）與 Q版 marker（assets/markers/{key}.png），缺圖自動退回 emoji ---- */
+/* ---- 圖片管線：真照片（assets/places/{key}.png，透明去背）與 Q版 marker（assets/markers/{key}.png），缺圖自動退回 emoji ---- */
 const imgFailed = new Set();
 function imgFail(el, key){ imgFailed.add(key); el.remove(); }
 function placePhoto(key, cls){
-  return (key && !imgFailed.has("p:"+key)) ? `<img class="${cls}" src="assets/places/${key}.jpg" onerror="imgFail(this,'p:${key}')">` : "";
+  return (key && !imgFailed.has("p:"+key)) ? `<img class="${cls}" src="assets/places/${key}.png" onerror="imgFail(this,'p:${key}')">` : "";
 }
 function markerArt(key){
   return (key && !imgFailed.has("m:"+key)) ? `<img class="mk-img" src="assets/markers/${key}.png" onerror="imgFail(this,'m:${key}')">` : "";
