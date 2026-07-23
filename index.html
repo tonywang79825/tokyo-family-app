@@ -1225,15 +1225,37 @@ function clearLive(){
 function liveVehicleTick(){
   const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
   if(!dayObj || dayObj.date !== todayStr()){ if(liveKey) clearLive(); return; }
-  const {current, next, heading} = getCurrentAndNextEvent(dayObj);
-  if(!heading){ if(liveKey) clearLive(); return; }
-  const from = eventCoord(current), to = eventCoord(next);
+  const {current, next, heading, all} = getCurrentAndNextEvent(dayObj);
+  let from, to, depMin, arrMin, mode, key;
+  if(heading){
+    // 標準情況：停留時間已結束，正前往下一站
+    if(!current || !next){ if(liveKey) clearLive(); return; }
+    from = eventCoord(current); to = eventCoord(next);
+    depMin = current.duration != null ? hmToMin(current.time)+current.duration : hmToMin(current.time);
+    arrMin = hmToMin(next.time);
+    mode = next.mode;
+    key = dayObj.day+"-"+current._idx+"-"+next._idx;
+  } else if(current && current.transitNote && current.duration != null){
+    // 事件本身就是移動過程（例如「N'EX 車上便當」——停留時間就是坐在車上的這段路程，
+    // 不是抵達後才靜止；用 transitNote 判斷，避免把「坐計程車去餐廳、到了坐下吃飯」
+    // 這種到站後才靜止的一般事件也誤判成移動中）
+    const prevEvent = current._idx>0 ? all[current._idx-1] : null;
+    const prevLL = prevEvent ? eventCoord(prevEvent) : null;
+    if(!prevLL){ if(liveKey) clearLive(); return; }
+    from = prevLL; to = eventCoord(current);
+    depMin = hmToMin(current.time);
+    arrMin = hmToMin(current.time) + current.duration;
+    mode = current.mode;
+    key = dayObj.day+"-self-"+current._idx;
+  } else {
+    if(liveKey) clearLive();
+    return;
+  }
   if(!from || !to){ if(liveKey) clearLive(); return; }
-  const key = dayObj.day+"-"+current._idx+"-"+next._idx;
   if(liveKey !== key){
     clearLive();
     liveKey = key;
-    fetchRealRoute(from, to, next.mode).then(pts=>{
+    fetchRealRoute(from, to, mode).then(pts=>{
       if(liveKey !== key) return;
       livePts = pts;
       liveLine = L.polyline(pts, {color:"#B23A18", weight:4, opacity:.85}).addTo(map);
@@ -1241,12 +1263,10 @@ function liveVehicleTick(){
   }
   const now = simNow();
   const nowMin = now.getUTCHours()*60 + now.getUTCMinutes() + now.getUTCSeconds()/60;
-  const depMin = current.duration != null ? hmToMin(current.time)+current.duration : hmToMin(current.time);
-  const arrMin = hmToMin(next.time);
   const frac = Math.max(0, Math.min(1, (nowMin-depMin) / Math.max(1, arrMin-depMin)));
   const pos = pointAlongRoute(livePts || [from, to], frac);
   if(!pos) return;
-  const emoji = MODE_EMOJI[next.mode] || (dayObj.day>=5 ? "🚗" : "🚃");
+  const emoji = MODE_EMOJI[mode] || (dayObj.day>=5 ? "🚗" : "🚃");
   if(!liveVeh){
     const icon = L.divIcon({className:"leaflet-div-icon", html:`<div class="vehicle">${emoji}</div>`, iconSize:[34,34], iconAnchor:[17,17]});
     liveVeh = L.marker(pos, {icon, zIndexOffset:1100, interactive:false}).addTo(map);
