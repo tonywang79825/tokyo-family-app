@@ -189,7 +189,7 @@
   .countdown-card{position:fixed;inset:0;z-index:900;background:var(--map-bg);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;}
   .countdown-card .big{font-size:48px;font-weight:900;color:var(--accent);}
   .leaflet-div-icon{background:none;border:none;}
-  .marker-pin{width:44px;height:44px;border-radius:50%;background:var(--paper);border:3px solid var(--accent);display:flex;align-items:center;justify-content:center;
+  .marker-pin{width:44px;height:44px;border-radius:14px;background:var(--paper);border:3px solid var(--accent);display:flex;align-items:center;justify-content:center;
     font-size:20px;box-shadow:0 3px 10px rgba(0,0,0,.3);position:relative;}
   .marker-pin.here{animation:float 2s ease-in-out infinite;border-color:var(--green);}
   @keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}
@@ -225,7 +225,7 @@
   #daySplash .d{font-size:19px;color:#fff;opacity:.85;font-weight:700;letter-spacing:3px;}
   #daySplash .t{font-size:30px;color:#fff;font-weight:900;margin-top:8px;text-align:center;padding:0 24px;}
   @keyframes splash{0%{opacity:0;}12%{opacity:1;}75%{opacity:1;}100%{opacity:0;}}
-  .mk-img{position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);border-radius:50%;object-fit:cover;z-index:1;}
+  .mk-img{position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);border-radius:11px;object-fit:contain;z-index:1;}
   .marker-badge{z-index:2;}
   .hero-img,.thumb-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
   .user-dot{width:16px;height:16px;border-radius:50%;background:#2A7BE4;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4);position:relative;}
@@ -695,14 +695,14 @@ function eventCoord(e){
   return null;
 }
 
-/* ---- 圖片管線：真照片（assets/places/{key}.png，透明去背）與 Q版 marker（assets/markers/{key}.png），缺圖自動退回 emoji ---- */
+/* ---- 圖片管線：真照片與地圖 marker 共用同一張圖（assets/places/{key}.png，透明去背），缺圖自動退回 emoji ---- */
 const imgFailed = new Set();
 function imgFail(el, key){ imgFailed.add(key); el.remove(); }
 function placePhoto(key, cls){
   return (key && !imgFailed.has("p:"+key)) ? `<img class="${cls}" src="assets/places/${key}.png" onerror="imgFail(this,'p:${key}')">` : "";
 }
 function markerArt(key){
-  return (key && !imgFailed.has("m:"+key)) ? `<img class="mk-img" src="assets/markers/${key}.png" onerror="imgFail(this,'m:${key}')">` : "";
+  return (key && !imgFailed.has("p:"+key)) ? `<img class="mk-img" src="assets/places/${key}.png" onerror="imgFail(this,'p:${key}')">` : "";
 }
 
 function makeIcon(emoji, isHere, badgeNum, dropDelay, minor, placeKey){
