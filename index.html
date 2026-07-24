@@ -691,7 +691,7 @@ function initMap(){
 // 縮遠（如成田→大井町整段路線）時縮小，手動放大到單一景點時放大，超出上下限就固定在極值不再變化。
 // 用 CSS 變數 --mzoom 而非直接改 transform，因為「現在在這」的浮動動畫（float）也會動 transform，
 // 兩者需要疊加而不是互相覆蓋。
-const MARKER_ZOOM_MIN = 10, MARKER_ZOOM_MAX = 17;
+const MARKER_ZOOM_MIN = 13, MARKER_ZOOM_MAX = 17;
 const MARKER_SCALE_MIN = 0.75, MARKER_SCALE_MAX = 3.41;
 function updateMarkerScale(){
   if(!map) return;
