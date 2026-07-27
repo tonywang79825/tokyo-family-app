@@ -780,12 +780,23 @@ function renderMap(dayObj, currentEvent){
   updateMarkerScale();
 }
 
+// 頂部固定 UI（標題列＋日期chip＋倒數卡）大約蓋住畫面上方 260px，
+// 聚焦到「現在在這」的放大 marker 時要把目標點往下推，不然 marker 上半會被蓋住。
+const FOCUS_TOP_OFFSET_PX = 130;
+function offsetFocusTarget(ll, zoom){
+  if(!map || !ll) return ll;
+  const pt = map.project(ll, zoom);
+  pt.y -= FOCUS_TOP_OFFSET_PX;
+  const shifted = map.unproject(pt, zoom);
+  return [shifted.lat, shifted.lng];
+}
+
 function focusCurrent(){
   const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
   const {current} = getCurrentAndNextEvent(dayObj);
   if(current){
     const ll = eventCoord(current);
-    if(ll) map.setView(ll, 15, {animate:true});
+    if(ll) map.setView(offsetFocusTarget(ll, 15), 15, {animate:true});
   }
 }
 
@@ -1301,7 +1312,7 @@ function focusOnCurrentChange(dayObj, current, next, heading){
     if(legFromLL && km > 20){
       map.flyToBounds([legFromLL, ll], {padding:[40,40], maxZoom:12, duration: Math.min(2.6, 1.2 + km/300)});
     } else {
-      map.flyTo(ll, 15, {duration: Math.min(2.6, 1.2 + km/80)});
+      map.flyTo(offsetFocusTarget(ll, 15), 15, {duration: Math.min(2.6, 1.2 + km/80)});
     }
     if(current && prevFocusLL && (prevFocusLL[0]!==ll[0] || prevFocusLL[1]!==ll[1])){
       const emoji = MODE_EMOJI[target.mode] || (dayObj.day>=5 ? "🚗" : "🚃");
@@ -1314,7 +1325,7 @@ function focusOnCurrentChange(dayObj, current, next, heading){
   } else {
     // 換日/初載：先讓 fitBounds 總覽在 splash 期間停一拍，再俯衝到目標站
     const guard = key;
-    setTimeout(()=>{ if(lastFocusedKey === guard) map.flyTo(ll, 14, {duration:1.6}); }, 1300);
+    setTimeout(()=>{ if(lastFocusedKey === guard) map.flyTo(offsetFocusTarget(ll, 14), 14, {duration:1.6}); }, 1300);
   }
   prevFocusLL = ll;
 }
