@@ -189,26 +189,26 @@
   .countdown-card{position:fixed;inset:0;z-index:900;background:var(--map-bg);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;}
   .countdown-card .big{font-size:48px;font-weight:900;color:var(--accent);}
   .leaflet-div-icon{background:none;border:none;}
-  .marker-pin{width:44px;height:44px;border-radius:14px;background:var(--paper);border:3px solid var(--accent);display:flex;align-items:center;justify-content:center;
-    font-size:20px;box-shadow:0 3px 10px rgba(0,0,0,.3);position:relative;transform-origin:50% 100%;transform:scale(var(--mzoom,1));transition:transform .3s ease;}
+  .marker-pin{width:132px;height:132px;border-radius:42px;background:var(--paper);border:9px solid var(--accent);display:flex;align-items:center;justify-content:center;
+    font-size:60px;box-shadow:0 3px 10px rgba(0,0,0,.3);position:relative;transform-origin:50% 100%;transform:scale(var(--mzoom,1));transition:transform .3s ease;}
   .marker-pin.has-photo{background:none;border:none;box-shadow:none;}
   .marker-pin.here{z-index:999 !important;animation:markerGrow .35s ease-out forwards, float 2s ease-in-out .35s infinite;border-color:var(--green);filter:drop-shadow(0 8px 22px rgba(212,72,32,.5));}
   .marker-pin.here.has-photo{filter:drop-shadow(0 10px 26px rgba(0,0,0,.55));}
   /* here 剛出現時先從原本大小平滑放大到目標倍率,結束值需與 float 的 0% 一致才會接得無縫 */
-  @keyframes markerGrow{0%{transform:translateY(0) scale(var(--mzoom,1));}100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}}
-  @keyframes float{0%,100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}50%{transform:translateY(-8px) scale(calc(var(--mzoom,1) * 2.36));}}
+  @keyframes markerGrow{0%{transform:translateY(0) scale(var(--mzoom,1));}100%{transform:translateY(0) scale(calc(var(--mzoom,1) * .7667));}}
+  @keyframes float{0%,100%{transform:translateY(0) scale(calc(var(--mzoom,1) * .7667));}50%{transform:translateY(-8px) scale(calc(var(--mzoom,1) * .7867));}}
   .marker-drop{animation:drop .5s ease-out backwards;}
   @keyframes drop{0%{transform:translateY(-16px) scale(.7);opacity:0;}60%{transform:translateY(3px) scale(1.03);opacity:1;}100%{transform:translateY(0) scale(1);}}
   .route-line{animation:ant-march 1.4s linear infinite;}
   @keyframes ant-march{to{stroke-dashoffset:-14;}}
-  .marker-badge{position:absolute;top:-6px;right:-6px;background:var(--accent);color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;
+  .marker-badge{position:absolute;top:-18px;right:-18px;background:var(--accent);color:#fff;border-radius:50%;width:54px;height:54px;font-size:30px;
     display:flex;align-items:center;justify-content:center;font-weight:900;}
-  .marker-dot{width:26px;height:26px;border-radius:50%;background:var(--paper);border:2px solid #A89F91;display:flex;align-items:center;justify-content:center;
-    font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,.25);position:relative;transform-origin:50% 50%;transform:scale(var(--mzoom,1));transition:transform .3s ease;}
+  .marker-dot{width:78px;height:78px;border-radius:50%;background:var(--paper);border:6px solid #A89F91;display:flex;align-items:center;justify-content:center;
+    font-size:36px;box-shadow:0 2px 6px rgba(0,0,0,.25);position:relative;transform-origin:50% 50%;transform:scale(var(--mzoom,1));transition:transform .3s ease;}
   .marker-dot.here{z-index:999 !important;border-color:var(--green);animation:markerDotGrow .35s ease-out forwards, floatDot 2s ease-in-out .35s infinite;filter:drop-shadow(0 6px 18px rgba(46,125,50,.5));}
-  @keyframes markerDotGrow{0%{transform:translateY(0) scale(var(--mzoom,1));}100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}}
-  @keyframes floatDot{0%,100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}50%{transform:translateY(-6px) scale(calc(var(--mzoom,1) * 2.36));}}
-  .marker-dot .marker-badge{width:14px;height:14px;font-size:8px;top:-5px;right:-5px;background:#A89F91;}
+  @keyframes markerDotGrow{0%{transform:translateY(0) scale(var(--mzoom,1));}100%{transform:translateY(0) scale(calc(var(--mzoom,1) * .7667));}}
+  @keyframes floatDot{0%,100%{transform:translateY(0) scale(calc(var(--mzoom,1) * .7667));}50%{transform:translateY(-6px) scale(calc(var(--mzoom,1) * .7867));}}
+  .marker-dot .marker-badge{width:42px;height:42px;font-size:24px;top:-15px;right:-15px;background:#A89F91;}
   .vehicle{font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));}
   .pulse-ring{width:10px;height:10px;border-radius:50%;position:relative;}
   .pulse-ring::before,.pulse-ring::after{content:"";position:absolute;inset:0;border-radius:50%;border:3px solid var(--accent);animation:ring 1.2s ease-out forwards;}
@@ -697,7 +697,10 @@ function initMap(){
 // 用 CSS 變數 --mzoom 而非直接改 transform，因為「現在在這」的浮動動畫（float）也會動 transform，
 // 兩者需要疊加而不是互相覆蓋。
 const MARKER_ZOOM_MIN = 13, MARKER_ZOOM_MAX = 17;
-const MARKER_SCALE_MIN = 0.75, MARKER_SCALE_MAX = 3.41;
+// marker-pin/marker-dot 的 CSS 框從 44/26px 加大為 132/78px（3倍），這裡的倍率跟著除以3，
+// 讓最終視覺大小不變——但瀏覽器現在是用 132px 的畫布去取樣原圖，而不是先縮到 44px 小畫布再拉大，
+// 避免 transform:scale() 從一個過小的畫布硬拉伸造成色塊感。
+const MARKER_SCALE_MIN = 0.25, MARKER_SCALE_MAX = 1.1367;
 function updateMarkerScale(){
   if(!map) return;
   const z = map.getZoom();
@@ -736,9 +739,9 @@ function makeIcon(emoji, isHere, badgeNum, dropDelay, minor, placeKey){
   return L.divIcon({
     className:"leaflet-div-icon",
     html: dropDelay!=null ? `<div class="marker-drop" style="animation-delay:${dropDelay}ms">${pin}</div>` : pin,
-    iconSize: minor?[26,26]:[44,44],
-    iconAnchor: minor?[13,13]:[22,44],
-    popupAnchor: minor?[0,-14]:[0,-40]
+    iconSize: minor?[78,78]:[132,132],
+    iconAnchor: minor?[39,39]:[66,132],
+    popupAnchor: minor?[0,-42]:[0,-120]
   });
 }
 
