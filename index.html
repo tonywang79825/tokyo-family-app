@@ -195,8 +195,8 @@
   .marker-pin.here{z-index:999 !important;animation:markerGrow .35s ease-out forwards, float 2s ease-in-out .35s infinite;border-color:var(--green);filter:drop-shadow(0 8px 22px rgba(212,72,32,.5));}
   .marker-pin.here.has-photo{filter:drop-shadow(0 10px 26px rgba(0,0,0,.55));}
   /* here 剛出現時先從原本大小平滑放大到目標倍率,結束值需與 float 的 0% 一致才會接得無縫 */
-  @keyframes markerGrow{0%{transform:translateY(0) scale(var(--mzoom,1));}100%{transform:translateY(0) scale(calc(var(--mzoom,1) * .7667));}}
-  @keyframes float{0%,100%{transform:translateY(0) scale(calc(var(--mzoom,1) * .7667));}50%{transform:translateY(-8px) scale(calc(var(--mzoom,1) * .7867));}}
+  @keyframes markerGrow{0%{transform:translateY(0) scale(var(--mzoom,1));}100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}}
+  @keyframes float{0%,100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}50%{transform:translateY(-8px) scale(calc(var(--mzoom,1) * 2.36));}}
   .marker-drop{animation:drop .5s ease-out backwards;}
   @keyframes drop{0%{transform:translateY(-16px) scale(.7);opacity:0;}60%{transform:translateY(3px) scale(1.03);opacity:1;}100%{transform:translateY(0) scale(1);}}
   .route-line{animation:ant-march 1.4s linear infinite;}
@@ -206,8 +206,8 @@
   .marker-dot{width:78px;height:78px;border-radius:50%;background:var(--paper);border:6px solid #A89F91;display:flex;align-items:center;justify-content:center;
     font-size:36px;box-shadow:0 2px 6px rgba(0,0,0,.25);position:relative;transform-origin:50% 50%;transform:scale(var(--mzoom,1));transition:transform .3s ease;}
   .marker-dot.here{z-index:999 !important;border-color:var(--green);animation:markerDotGrow .35s ease-out forwards, floatDot 2s ease-in-out .35s infinite;filter:drop-shadow(0 6px 18px rgba(46,125,50,.5));}
-  @keyframes markerDotGrow{0%{transform:translateY(0) scale(var(--mzoom,1));}100%{transform:translateY(0) scale(calc(var(--mzoom,1) * .7667));}}
-  @keyframes floatDot{0%,100%{transform:translateY(0) scale(calc(var(--mzoom,1) * .7667));}50%{transform:translateY(-6px) scale(calc(var(--mzoom,1) * .7867));}}
+  @keyframes markerDotGrow{0%{transform:translateY(0) scale(var(--mzoom,1));}100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}}
+  @keyframes floatDot{0%,100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}50%{transform:translateY(-6px) scale(calc(var(--mzoom,1) * 2.36));}}
   .marker-dot .marker-badge{width:42px;height:42px;font-size:24px;top:-15px;right:-15px;background:#A89F91;}
   .vehicle{font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));}
   .pulse-ring{width:10px;height:10px;border-radius:50%;position:relative;}
