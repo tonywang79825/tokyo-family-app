@@ -201,14 +201,11 @@
   @keyframes drop{0%{transform:translateY(-16px) scale(.7);opacity:0;}60%{transform:translateY(3px) scale(1.03);opacity:1;}100%{transform:translateY(0) scale(1);}}
   .route-line{animation:ant-march 1.4s linear infinite;}
   @keyframes ant-march{to{stroke-dashoffset:-14;}}
-  .marker-badge{position:absolute;top:-18px;right:-18px;background:var(--accent);color:#fff;border-radius:50%;width:54px;height:54px;font-size:30px;
-    display:flex;align-items:center;justify-content:center;font-weight:900;}
   .marker-dot{width:78px;height:78px;border-radius:50%;background:var(--paper);border:6px solid #A89F91;display:flex;align-items:center;justify-content:center;
     font-size:36px;box-shadow:0 2px 6px rgba(0,0,0,.25);position:relative;transform-origin:50% 50%;transform:scale(var(--mzoom,1));transition:transform .3s ease;}
   .marker-dot.here{z-index:999 !important;border-color:var(--green);animation:markerDotGrow .35s ease-out forwards, floatDot 2s ease-in-out .35s infinite;filter:drop-shadow(0 6px 18px rgba(46,125,50,.5));}
   @keyframes markerDotGrow{0%{transform:translateY(0) scale(var(--mzoom,1));}100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}}
   @keyframes floatDot{0%,100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}50%{transform:translateY(-6px) scale(calc(var(--mzoom,1) * 2.36));}}
-  .marker-dot .marker-badge{width:42px;height:42px;font-size:24px;top:-15px;right:-15px;background:#A89F91;}
   .vehicle{font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));}
   .pulse-ring{width:10px;height:10px;border-radius:50%;position:relative;}
   .pulse-ring::before,.pulse-ring::after{content:"";position:absolute;inset:0;border-radius:50%;border:3px solid var(--accent);animation:ring 1.2s ease-out forwards;}
@@ -222,17 +219,17 @@
     background:rgba(46,40,34,.55);backdrop-filter:blur(4px);pointer-events:none;}
   #daySplash.show{display:flex;animation:splash 1.6s ease forwards;}
   #bigCountdown{position:fixed;top:calc(env(safe-area-inset-top,0px) + 172px);left:0;right:0;margin:0 auto;width:fit-content;z-index:450;
-    background:var(--paper);border-radius:18px;box-shadow:0 6px 24px rgba(46,40,34,.28);padding:8px 22px 10px;text-align:center;
+    background:var(--paper);border-radius:18px;box-shadow:0 6px 24px rgba(46,40,34,.28);padding:10px 22px 12px;text-align:center;
     max-width:88vw;pointer-events:none;}
-  #bigCountdown .bc-label{font-size:12px;font-weight:800;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  #bigCountdown .bc-time{font-size:36px;font-weight:900;line-height:1.1;color:var(--ink);font-variant-numeric:tabular-nums;}
+  #bigCountdown .bc-name{font-size:20px;font-weight:900;line-height:1.25;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #bigCountdown .bc-next{margin-top:4px;font-size:12.5px;font-weight:700;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #bigCountdown .bc-next b{font-size:14px;color:var(--accent);font-variant-numeric:tabular-nums;}
   #bigCountdown.urgent{background:var(--accent);animation:pulse 1.2s infinite;}
-  #bigCountdown.urgent .bc-label,#bigCountdown.urgent .bc-time{color:#fff;}
+  #bigCountdown.urgent .bc-name,#bigCountdown.urgent .bc-next,#bigCountdown.urgent .bc-next b{color:#fff;}
   #daySplash .d{font-size:19px;color:#fff;opacity:.85;font-weight:700;letter-spacing:3px;}
   #daySplash .t{font-size:30px;color:#fff;font-weight:900;margin-top:8px;text-align:center;padding:0 24px;}
   @keyframes splash{0%{opacity:0;}12%{opacity:1;}75%{opacity:1;}100%{opacity:0;}}
   .mk-img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:1;filter:contrast(1.08) saturate(1.06) drop-shadow(0 3px 6px rgba(46,40,34,.35));}
-  .marker-badge{z-index:2;}
   .hero-img,.thumb-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
   .user-dot{width:16px;height:16px;border-radius:50%;background:#2A7BE4;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4);position:relative;}
   .user-dot::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid #2A7BE4;opacity:.5;animation:ring 2s ease-out infinite;}
@@ -652,20 +649,30 @@ function renderStatus(){
   bigCountdownTick();
 }
 
+// 頂部卡片答「現在在哪」：headline 優先顯示 current,今天還沒開始/沒有current時退回顯示 next 自己的名字。
+// 下面的 bc-next 倒數行只在 next 是「跟 headline 不同的另一個事件」時才顯示,避免headline已經是next時重複講一次。
 function bigCountdownTick(){
   const el = document.getElementById("bigCountdown");
   const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
   if(!dayObj || dayObj.date !== todayStr()){ el.style.display="none"; return; }
-  const {next, heading} = getCurrentAndNextEvent(dayObj);
-  if(!next){ el.style.display="none"; return; }
-  const now = simNow();
-  const diff = hmToMin(next.time)*60 - (now.getUTCHours()*3600 + now.getUTCMinutes()*60 + now.getUTCSeconds());
-  if(diff <= 0){ el.style.display="none"; return; }
-  const h = Math.floor(diff/3600), m = Math.floor(diff%3600/60), s = diff%60;
-  const timeStr = h>0 ? `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}` : `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
-  const place = next.place ? TRIP_DATA.places[next.place] : null;
-  el.innerHTML = `<div class="bc-label">${MODE_EMOJI[next.mode]||"⏳"} ${heading?"前往":"下一站"} ${place?.name || next.title} ・ ${next.time}</div><div class="bc-time">${timeStr}</div>`;
-  el.classList.toggle("urgent", diff <= 900);
+  const {current, next, heading} = getCurrentAndNextEvent(dayObj);
+  const headline = current || next;
+  if(!headline){ el.style.display="none"; return; }
+  const hPlace = headline.place ? TRIP_DATA.places[headline.place] : null;
+  let nextHtml = "", urgent = false;
+  if(next && next !== headline){
+    const now = simNow();
+    const diff = hmToMin(next.time)*60 - (now.getUTCHours()*3600 + now.getUTCMinutes()*60 + now.getUTCSeconds());
+    if(diff > 0){
+      const h = Math.floor(diff/3600), m = Math.floor(diff%3600/60), s = diff%60;
+      const timeStr = h>0 ? `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}` : `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+      const nPlace = next.place ? TRIP_DATA.places[next.place] : null;
+      nextHtml = `<div class="bc-next">${MODE_EMOJI[next.mode]||"⏳"} ${heading?"前往":"下一站"} ${nPlace?.name || next.title}・${next.time}・還有 <b>${timeStr}</b></div>`;
+      urgent = diff <= 900;
+    }
+  }
+  el.innerHTML = `<div class="bc-name">${hPlace?.name || headline.title}</div>${nextHtml}`;
+  el.classList.toggle("urgent", urgent);
   el.style.display = "block";
 }
 
@@ -732,10 +739,10 @@ function markerArt(key){
   return (key && !imgFailed.has("p:"+key)) ? `<img class="mk-img" src="assets/places/${key}.png" onerror="imgFail(this,'p:${key}')">` : "";
 }
 
-function makeIcon(emoji, isHere, badgeNum, dropDelay, minor, placeKey){
+function makeIcon(emoji, isHere, dropDelay, minor, placeKey){
   const hasPhoto = !minor && placeKey && !imgFailed.has("p:"+placeKey);
   const cls = (minor ? "marker-dot" : "marker-pin") + (hasPhoto ? " has-photo" : "");
-  const pin = `<div class="${cls} ${isHere?'here':''}">${emoji}${minor?"":markerArt(placeKey)}${badgeNum?`<span class="marker-badge">${badgeNum}</span>`:""}</div>`;
+  const pin = `<div class="${cls} ${isHere?'here':''}">${emoji}${minor?"":markerArt(placeKey)}</div>`;
   return L.divIcon({
     className:"leaflet-div-icon",
     html: dropDelay!=null ? `<div class="marker-drop" style="animation-delay:${dropDelay}ms">${pin}</div>` : pin,
@@ -762,7 +769,7 @@ function renderMap(dayObj, currentEvent){
     pts.push(ll);
     const minor = !e.place;
     const marker = L.marker(ll, {
-      icon: makeIcon(TYPE_ICON[e.type]||"📍", isHere, seq, dayChanged ? seq*70 : null, minor, e.place),
+      icon: makeIcon(TYPE_ICON[e.type]||"📍", isHere, dayChanged ? seq*70 : null, minor, e.place),
       zIndexOffset: isHere ? 1000 : 0
     }).addTo(markersLayer);
     const place = e.place ? TRIP_DATA.places[e.place] : null;
@@ -820,11 +827,13 @@ function statusBadge(e){
 
 function renderSheet(){
   const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
-  const {current, next, nextNext, heading, all} = getCurrentAndNextEvent(dayObj);
+  const {current, next, nextNext, all} = getCurrentAndNextEvent(dayObj);
 
-  // heading 模式：主卡片提前顯示下一站，預告列表只剩下下站
-  const focusEvent = heading ? next : current;
-  const upcoming = (heading ? [nextNext] : [next, nextNext]).filter(Boolean);
+  // 底部卡片一律主打「下一站」（含 GO 按鈕導去下一站），只有今天已經沒有下一站時才退回顯示 current。
+  // 「現在在哪」交給頂部的 bigCountdown 卡負責，這裡不重複。
+  const focusEvent = next || current;
+  const isNextFocus = !!next;
+  const upcoming = (isNextFocus ? [nextNext] : []).filter(Boolean);
   const upcomingHtml = upcoming.length ? `<div class="upcoming-list">${upcoming.map(e=>{
     const place = e.place ? TRIP_DATA.places[e.place] : null;
     const cat = catOf(e.type);
@@ -837,21 +846,17 @@ function renderSheet(){
     </div>`;
   }).join("")}</div>` : "";
 
-  // collapsed
-  const mins = next ? minutesUntil(next.time) : null;
+  // collapsed：focusEvent 本身就是下一站時，倒數行不用再講一次「下一站」，只講還剩多少時間
+  const mins = isNextFocus ? minutesUntil(focusEvent.time) : null;
   const cdHtml = (mins!=null && mins>0)
-    ? `<div class="countdown ${mins<=15?'urgent':''}">⏳ ${heading?"距開始":"下一站"} ${mins>=60 ? Math.floor(mins/60)+" 小時 "+(mins%60)+" 分" : mins+" 分"}${heading?"":"後"}</div>`
+    ? `<div class="countdown ${mins<=15?'urgent':''}">⏳ 還有 ${mins>=60 ? Math.floor(mins/60)+" 小時 "+(mins%60)+" 分" : mins+" 分"}</div>`
     : "";
   const collapsed = document.getElementById("sheetCollapsed");
   if(focusEvent){
     const place = focusEvent.place ? TRIP_DATA.places[focusEvent.place] : null;
-    const modeChip = heading ? `<span class="badge pending">${MODE_EMOJI[focusEvent.mode]||"🧭"} 前往下一站</span>` : `<span class="badge confirmed">現在</span>`;
-    let voucher = findVoucher(dayObj.day, focusEvent), vAhead = false;
-    if(!(voucher && voucher.code!=="待確認") && next){
-      const nv = findVoucher(dayObj.day, next);
-      if(nv && nv.code!=="待確認"){ voucher = nv; vAhead = true; }
-    }
-    const vChipHtml = (voucher && voucher.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${voucher.code}')">🎫 ${vAhead?"下一站 ":""}${voucher.code}<span>複製</span></div>` : "";
+    const modeChip = isNextFocus ? `<span class="badge pending">${MODE_EMOJI[focusEvent.mode]||"🧭"} 下一站</span>` : `<span class="badge confirmed">現在</span>`;
+    const voucher = findVoucher(dayObj.day, focusEvent);
+    const vChipHtml = (voucher && voucher.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${voucher.code}')">🎫 ${voucher.code}<span>複製</span></div>` : "";
     collapsed.innerHTML = `
       <div class="cur-row">
         <div class="thumb type-${catOf(focusEvent.type)}">${TYPE_ICON[focusEvent.type]||"📍"}${placePhoto(focusEvent.place,"thumb-img")}</div>
