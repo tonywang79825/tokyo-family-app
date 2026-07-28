@@ -53,7 +53,6 @@
   .menu-item{background:none;border:none;text-align:left;padding:10px 12px;border-radius:10px;font-size:14px;font-weight:700;
     color:var(--ink);cursor:pointer;white-space:nowrap;}
   .menu-item:active{background:var(--paper-2);}
-  .menu-item.playing{color:var(--green);}
   .day-chips{display:flex;gap:6px;overflow-x:auto;pointer-events:auto;padding:2px;scrollbar-width:none;}
   .day-chips::-webkit-scrollbar{display:none;}
   .chip{flex:none;background:rgba(255,252,246,.85);backdrop-filter:blur(10px);border:2px solid transparent;border-radius:20px;
@@ -65,6 +64,9 @@
   .fab{position:fixed;z-index:400;width:48px;height:48px;border-radius:50%;background:var(--paper);box-shadow:var(--shadow);
     display:flex;align-items:center;justify-content:center;font-size:20px;border:none;cursor:pointer;}
   .fab-compass{right:14px;bottom:210px;}
+  .fab-sim{right:14px;bottom:270px;background:#333;color:#fff;font-size:12px;font-weight:bold;width:48px;}
+  .fab-simplay{right:14px;bottom:330px;background:var(--accent);color:#fff;font-size:11px;font-weight:bold;width:48px;}
+  .fab-simplay.playing{background:var(--green);}
 
   /* ---------- Bottom sheet ---------- */
   .sheet{position:fixed;left:0;right:0;bottom:0;z-index:600;background:var(--paper);
@@ -225,9 +227,9 @@
   #daySplash{position:fixed;inset:0;z-index:900;display:none;align-items:center;justify-content:center;flex-direction:column;
     background:rgba(46,40,34,.55);backdrop-filter:blur(4px);pointer-events:none;}
   #daySplash.show{display:flex;animation:splash 1.6s ease forwards;}
-  /* 只答「現在在哪」一件事,單行、壓低高度盡量少擋地圖。固定 left/right（不用 fit-content 置中）,
-     右邊留 76px（跟 .fab 的 right:14px+width:48px+緩衝一致），避免地點名稱太長時卡片撐寬蓋到右側浮動按鈕 */
-  #bigCountdown{position:fixed;top:calc(env(safe-area-inset-top,0px) + 172px);left:12px;right:76px;z-index:450;
+  /* 只答「現在在哪」一件事,單行、壓低高度盡量少擋地圖。固定 left/right（不用 fit-content 置中）——
+     FAB 整併進選單後,這個高度右側已經沒有按鈕擋著,right 可以跟其他元素一樣貼 14px */
+  #bigCountdown{position:fixed;top:calc(env(safe-area-inset-top,0px) + 172px);left:12px;right:14px;z-index:450;
     background:var(--paper);border-radius:16px;box-shadow:0 6px 24px rgba(46,40,34,.28);padding:6px 4px;
     display:flex;align-items:center;gap:2px;pointer-events:none;}
   #bigCountdown .bc-content{flex:1;min-width:0;text-align:center;font-size:18px;font-weight:900;line-height:1.3;
@@ -290,9 +292,11 @@
   <button class="menu-item" id="menuShop">🛍️ 購物清單</button>
   <button class="menu-item" id="menuTicket">🎫 憑證口袋</button>
   <button class="menu-item" id="menuLocate">📍 我的位置</button>
-  <button class="menu-item" id="menuSim" style="display:none;">🧪 模擬時間 +30分</button>
-  <button class="menu-item" id="menuSimPlay" style="display:none;">▶ 自動流逝 1x</button>
 </div>
+
+<!-- 模擬時間工具只在測試/展示時用（長按時鐘啟用),需要連續快速點擊,直接放主畫面比塞進選單方便 -->
+<button class="fab fab-sim" id="fabSim" title="模擬時間 +30分" style="display:none;">+30分</button>
+<button class="fab fab-simplay" id="fabSimPlay" title="自動流逝：點擊播放/暫停，長按切換倍速" style="display:none;">▶1x</button>
 
 <button class="fab fab-compass" id="fabCompass" title="回到當前地點">🧭</button>
 <div id="toast"></div>
@@ -522,7 +526,7 @@ function advanceSim(min){ simOffsetMin += min; renderAll(); }
 const SIM_SPEEDS = [1, 5, 15, 60];
 let simSpeedIdx = 1, simAutoTimer = null;
 function updateSimPlayBtn(){
-  const btn = document.getElementById("menuSimPlay");
+  const btn = document.getElementById("fabSimPlay");
   btn.textContent = (simAutoTimer ? "⏸" : "▶") + SIM_SPEEDS[simSpeedIdx] + "x";
   btn.classList.toggle("playing", !!simAutoTimer);
 }
@@ -543,8 +547,8 @@ function toggleSim(){
   SIM_ACTIVE = !SIM_ACTIVE;
   simOffsetMin = 0;
   stopSimPlay();
-  document.getElementById("menuSim").style.display = SIM_ACTIVE ? "flex" : "none";
-  document.getElementById("menuSimPlay").style.display = SIM_ACTIVE ? "flex" : "none";
+  document.getElementById("fabSim").style.display = SIM_ACTIVE ? "flex" : "none";
+  document.getElementById("fabSimPlay").style.display = SIM_ACTIVE ? "flex" : "none";
   autoFollowToday = true;
   renderAll();
 }
@@ -562,16 +566,6 @@ function minutesUntilEv(dayObj, e){ return Math.round((eventEpoch(dayObj, e) - n
 
 /* ---- 天氣（Open-Meteo，免 API key；失敗時靜默略過） ---- */
 let weatherState = null;
-function weatherEmoji(code){
-  if(code===0) return "☀️";
-  if(code<=2) return "🌤";
-  if(code===3) return "☁️";
-  if(code<=48) return "🌫";
-  if(code<=67) return "🌧";
-  if(code<=77) return "🌨";
-  if(code<=82) return "🌧";
-  return "⛈";
-}
 async function loadWeather(){
   try{
     const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=35.68&longitude=139.75&daily=weathercode,precipitation_probability_max&timezone=Asia%2FTokyo&forecast_days=1");
@@ -660,8 +654,8 @@ function renderStatus(){
     const d = getCurrentTripDay();
     sub.textContent = d ? `Day ${d}・${getAllDays().find(x=>x.day===d).theme}` : "旅行期間";
   }
-  if(weatherState){
-    sub.textContent += ` ・ ${weatherEmoji(weatherState.code)}${weatherState.rain>=30?` ☔${weatherState.rain}%`:""}`;
+  if(weatherState && weatherState.rain>=30){
+    sub.textContent += ` ・ ☔${weatherState.rain}%`;
   }
   checkHardDeadlines();
   liveVehicleTick();
@@ -775,12 +769,15 @@ function renderMap(dayObj, currentEvent){
   if(passedLine){ map.removeLayer(passedLine); passedLine=null; }
   const dayChanged = lastFitDay !== dayObj.day;
   const events = eventsWithOverrides(dayObj.day, getDayEvents(dayObj)).filter(e=> !(e.override && e.override.status==="skip"));
+  // 手動瀏覽景點時（browseIdx有值),放大/浮動的「here」樣式跟著瀏覽到的景點走,不是實際的現在時間點
+  const browsedTarget = browseIdx!=null ? browsableEvents(dayObj)[browseIdx] : null;
+  const hereTarget = browsedTarget || currentEvent;
   const pts = [];
   let hereIdx = -1;
   events.forEach((e)=>{
     const ll = eventCoord(e);
     if(!ll) return;
-    const isHere = currentEvent && currentEvent._idx===e._idx;
+    const isHere = hereTarget && hereTarget._idx===e._idx;
     if(isHere) hereIdx = pts.length;
     const seq = pts.length + 1;
     pts.push(ll);
@@ -849,10 +846,10 @@ function browsePlace(delta){
     base = startIdx>=0 ? startIdx : 0;
   }
   browseIdx = (base + delta + events.length) % events.length;
+  renderAll(); // 先重畫 marker（讓瀏覽到的景點套用放大/浮動樣式),再讓地圖飛過去,兩者才會同步
   const target = events[browseIdx];
   const ll = eventCoord(target);
-  if(ll) map.flyTo(offsetFocusTarget(ll, 15), 15, {duration:1});
-  bigCountdownTick();
+  if(ll) map.flyTo(ll, 15, {duration:1}); // 瀏覽模式要求正中央,不套用 offsetFocusTarget 的往下偏移
 }
 
 /* =========================================================
@@ -1489,10 +1486,10 @@ function startApp(){
     if(userLL) map.flyTo(userLL, 16, {duration:.8});
     else showToast("尚未取得定位（請允許定位權限）");
   };
-  document.getElementById("menuSim").onclick = ()=>advanceSim(30);
+  document.getElementById("fabSim").onclick = ()=>advanceSim(30);
 
   let simPlayPressTimer=null, simPlayLongPressFired=false;
-  const fabSimPlay = document.getElementById("menuSimPlay");
+  const fabSimPlay = document.getElementById("fabSimPlay");
   function startSimPlayPress(){ simPlayLongPressFired=false; simPlayPressTimer=setTimeout(()=>{ simPlayLongPressFired=true; cycleSimSpeed(); }, 600); }
   function cancelSimPlayPress(){ clearTimeout(simPlayPressTimer); }
   fabSimPlay.addEventListener("touchstart", startSimPlayPress);
