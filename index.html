@@ -81,8 +81,11 @@
   .cur-info{flex:1;min-width:0;}
   .cur-info .name{font-weight:900;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .cur-info .meta{font-size:12px;color:var(--ink-soft);margin-top:2px;}
-  .cur-info .countdown{font-size:12px;font-weight:800;color:var(--ink-soft);margin-top:2px;}
-  .cur-info .countdown.urgent{color:var(--accent);animation:pulse 1.2s infinite;}
+  /* 現在是全 app 唯一顯示倒數的地方（頂部卡片只講現在在哪),數字要夠大夠顯眼 */
+  .cur-info .countdown{font-size:12px;font-weight:800;color:var(--ink-soft);margin-top:3px;display:flex;align-items:baseline;gap:5px;}
+  .cur-info .countdown b{font-size:26px;color:var(--ink);font-variant-numeric:tabular-nums;font-weight:900;}
+  .cur-info .countdown.urgent{color:var(--accent);}
+  .cur-info .countdown.urgent b{color:var(--accent);animation:pulse 1.2s infinite;}
   .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-left:6px;}
   .badge.confirmed{background:#E3F1E6;color:var(--green);}
   .badge.pending{background:#FBEAD3;color:var(--orange);}
@@ -219,16 +222,12 @@
   #daySplash{position:fixed;inset:0;z-index:900;display:none;align-items:center;justify-content:center;flex-direction:column;
     background:rgba(46,40,34,.55);backdrop-filter:blur(4px);pointer-events:none;}
   #daySplash.show{display:flex;animation:splash 1.6s ease forwards;}
-  /* 固定 left/right（不用 fit-content 置中）,右邊留 76px（跟 .fab 的 right:14px+width:48px+緩衝一致），
-     避免地點名稱太長時卡片撐寬蓋到右側浮動按鈕 */
+  /* 只答「現在在哪」一件事,單行、壓低高度盡量少擋地圖。固定 left/right（不用 fit-content 置中）,
+     右邊留 76px（跟 .fab 的 right:14px+width:48px+緩衝一致），避免地點名稱太長時卡片撐寬蓋到右側浮動按鈕 */
   #bigCountdown{position:fixed;top:calc(env(safe-area-inset-top,0px) + 172px);left:12px;right:76px;z-index:450;
-    background:var(--paper);border-radius:18px;box-shadow:0 6px 24px rgba(46,40,34,.28);padding:10px 18px 12px;text-align:center;
+    background:var(--paper);border-radius:16px;box-shadow:0 6px 24px rgba(46,40,34,.28);padding:9px 18px;text-align:center;
     pointer-events:none;}
-  #bigCountdown .bc-name{font-size:20px;font-weight:900;line-height:1.25;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  #bigCountdown .bc-next{margin-top:4px;font-size:12.5px;font-weight:700;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  #bigCountdown .bc-next b{font-size:14px;color:var(--accent);font-variant-numeric:tabular-nums;}
-  #bigCountdown.urgent{background:var(--accent);animation:pulse 1.2s infinite;}
-  #bigCountdown.urgent .bc-name,#bigCountdown.urgent .bc-next,#bigCountdown.urgent .bc-next b{color:#fff;}
+  #bigCountdown .bc-name{font-size:18px;font-weight:900;line-height:1.3;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   #daySplash .d{font-size:19px;color:#fff;opacity:.85;font-weight:700;letter-spacing:3px;}
   #daySplash .t{font-size:30px;color:#fff;font-weight:900;margin-top:8px;text-align:center;padding:0 24px;}
   @keyframes splash{0%{opacity:0;}12%{opacity:1;}75%{opacity:1;}100%{opacity:0;}}
@@ -652,30 +651,17 @@ function renderStatus(){
   bigCountdownTick();
 }
 
-// 頂部卡片答「現在在哪」：headline 優先顯示 current,今天還沒開始/沒有current時退回顯示 next 自己的名字。
-// 下面的 bc-next 倒數行只在 next 是「跟 headline 不同的另一個事件」時才顯示,避免headline已經是next時重複講一次。
+// 頂部卡片只答「現在在哪」一件事：headline 優先顯示 current,今天還沒開始/沒有current時退回顯示 next 自己的名字。
+// 倒數改放到底部卡片（放大顯示）,這裡不重複、也盡量壓低卡片高度少擋地圖。
 function bigCountdownTick(){
   const el = document.getElementById("bigCountdown");
   const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
   if(!dayObj || dayObj.date !== todayStr()){ el.style.display="none"; return; }
-  const {current, next, heading} = getCurrentAndNextEvent(dayObj);
+  const {current, next} = getCurrentAndNextEvent(dayObj);
   const headline = current || next;
   if(!headline){ el.style.display="none"; return; }
   const hPlace = headline.place ? TRIP_DATA.places[headline.place] : null;
-  let nextHtml = "", urgent = false;
-  if(next && next !== headline){
-    const now = simNow();
-    const diff = hmToMin(next.time)*60 - (now.getUTCHours()*3600 + now.getUTCMinutes()*60 + now.getUTCSeconds());
-    if(diff > 0){
-      const h = Math.floor(diff/3600), m = Math.floor(diff%3600/60), s = diff%60;
-      const timeStr = h>0 ? `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}` : `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
-      const nPlace = next.place ? TRIP_DATA.places[next.place] : null;
-      nextHtml = `<div class="bc-next">${MODE_EMOJI[next.mode]||"⏳"} ${heading?"前往":"下一站"} ${nPlace?.name || next.title}・${next.time}・還有 <b>${timeStr}</b></div>`;
-      urgent = diff <= 900;
-    }
-  }
-  el.innerHTML = `<div class="bc-name">${hPlace?.name || headline.title}</div>${nextHtml}`;
-  el.classList.toggle("urgent", urgent);
+  el.innerHTML = `<div class="bc-name">${hPlace?.name || headline.title}</div>`;
   el.style.display = "block";
 }
 
@@ -852,7 +838,7 @@ function renderSheet(){
   // collapsed：focusEvent 本身就是下一站時，倒數行不用再講一次「下一站」，只講還剩多少時間
   const mins = isNextFocus ? minutesUntil(focusEvent.time) : null;
   const cdHtml = (mins!=null && mins>0)
-    ? `<div class="countdown ${mins<=15?'urgent':''}">⏳ 還有 ${mins>=60 ? Math.floor(mins/60)+" 小時 "+(mins%60)+" 分" : mins+" 分"}</div>`
+    ? `<div class="countdown ${mins<=15?'urgent':''}">⏳ 還有 <b>${mins>=60 ? Math.floor(mins/60)+" 小時 "+(mins%60)+" 分" : mins+" 分"}</b></div>`
     : "";
   const collapsed = document.getElementById("sheetCollapsed");
   if(focusEvent){
@@ -1328,11 +1314,9 @@ function focusOnCurrentChange(dayObj, current, next, heading){
     } else {
       map.flyTo(offsetFocusTarget(ll, 15), 15, {duration: Math.min(2.6, 1.2 + km/80)});
     }
-    if(current && prevFocusLL && (prevFocusLL[0]!==ll[0] || prevFocusLL[1]!==ll[1])){
-      const emoji = MODE_EMOJI[target.mode] || (dayObj.day>=5 ? "🚗" : "🚃");
-      const place = target.place ? TRIP_DATA.places[target.place] : null;
-      showToast(`${emoji} 前往：${place?.name || target.title}`);
-    } else if(!heading && current){
+    // 「前往：X」這件事現在由底部卡片持續顯示（下一站+放大倒數),不需要再跳一次浮動toast
+    // 蓋住狀態列,這裡只保留底部卡片沒涵蓋到的加值資訊：憑證提醒。
+    if(!heading && current){
       const v = findVoucher(dayObj.day, current);
       if(v && v.code!=="待確認") showToast(`🎫 ${v.name} 憑證：${v.code}`);
     }
