@@ -75,7 +75,8 @@
     transform:translateY(0);transition:height .38s cubic-bezier(.34,1.56,.64,1);touch-action:none;
     height:190px;padding-bottom:env(safe-area-inset-bottom,0px);}
   .sheet.expanded{height:calc(100% - 130px);}
-  .sheet-handle{width:38px;height:5px;background:var(--gray2);border-radius:3px;margin:9px auto 4px;opacity:.6;}
+  .sheet-handle{width:100%;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .sheet-handle::before{content:"";width:38px;height:5px;background:var(--gray2);border-radius:3px;opacity:.6;}
   .sheet-collapsed{display:flex;flex-direction:column;gap:6px;padding:6px 16px 0;}
   .cur-row{display:flex;gap:12px;align-items:center;}
   .sheet.expanded .sheet-collapsed{display:none;}
@@ -1371,9 +1372,19 @@ function focusOnCurrentChange(dayObj, current, next, heading){
     // 「前往：X」這件事現在由底部卡片持續顯示（下一站+放大倒數),不需要再跳一次浮動toast。
     // 憑證提醒 toast 會蓋住頂部標題卡，改為使用者主動點「憑證口袋」才看得到，不再自動彈出。
   } else {
-    // 換日/初載：先讓 fitBounds 總覽在 splash 期間停一拍，再俯衝到目標站
+    // 換日/初載：先讓 fitBounds 總覽在 splash 期間停一拍，再飛到目標——
+    // 若當下正是「前往下一站」的通勤途中（heading 且有明確起點），涵蓋起點+終點兩端，
+    // 讓這天第一段通勤看得到，不要直接俯衝到終點害整段路程憑空消失。
     const guard = key;
-    setTimeout(()=>{ if(lastFocusedKey === guard) map.flyTo(offsetFocusTarget(ll, 14), 14, {duration:1.6}); }, 1300);
+    const legFromLL = heading ? eventCoord(current) : null;
+    setTimeout(()=>{
+      if(lastFocusedKey !== guard) return;
+      if(legFromLL && distKm(legFromLL, ll) > 0.3){
+        map.flyToBounds([legFromLL, ll], {padding:[40,100], maxZoom:15, duration:1.6});
+      } else {
+        map.flyTo(offsetFocusTarget(ll, 14), 14, {duration:1.6});
+      }
+    }, 1300);
   }
   prevFocusLL = ll;
 }
