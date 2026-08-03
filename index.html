@@ -564,6 +564,12 @@ function minutesUntil(hm){
 }
 function hmToMin(hm){ const [h,m] = hm.split(":").map(Number); return h*60+m; }
 function durationLabel(mins){ return mins>=60 ? `${Math.floor(mins/60)}小時${mins%60?(mins%60)+"分":""}` : `${mins}分`; }
+// 交通/物流事件一律顯示事件自己的標題（例如「ecbo cloak 行李寄放」），不要被連結的
+// place 名稱蓋掉——否則「去HOSTEL LUND寄放行李」會被誤讀成「入住HOSTEL LUND」
+function eventLabel(e){
+  const place = e.place ? TRIP_DATA.places[e.place] : null;
+  return (catOf(e.type)==="transit" || e.type==="logistics") ? e.title : (place?.name || e.title);
+}
 function eventTz(e){ return (e.coord && e.coord[0] < 30) ? "+08:00" : "+09:00"; }
 function eventEpoch(dayObj, e){ return new Date(dayObj.date+"T"+e.time+":00"+eventTz(e)).getTime(); }
 function minutesUntilEv(dayObj, e){ return Math.round((eventEpoch(dayObj, e) - nowEpoch())/60000); }
@@ -686,8 +692,7 @@ function bigCountdownTick(){
     headline = current || next;
   }
   if(!headline){ el.style.display="none"; return; }
-  const hPlace = headline.place ? TRIP_DATA.places[headline.place] : null;
-  content.textContent = hPlace?.name || headline.title;
+  content.textContent = eventLabel(headline);
   el.style.display = "flex";
 }
 
@@ -878,13 +883,12 @@ function renderSheet(){
   const isNextFocus = !!next;
   const upcoming = (isNextFocus ? [nextNext] : []).filter(Boolean);
   const upcomingHtml = upcoming.length ? `<div class="upcoming-list">${upcoming.map(e=>{
-    const place = e.place ? TRIP_DATA.places[e.place] : null;
     const cat = catOf(e.type);
     const icon = cat==="transit" ? (MODE_EMOJI[e.mode] || TYPE_ICON[e.type] || "📍") : (TYPE_ICON[e.type]||"📍");
     return `<div class="event-row type-${cat}" onclick="handleEventTap(${e._idx})">
       <div class="time">${e.time}</div>
       <div class="thumb-sm">${icon}${placePhoto(e.place,"thumb-sm-img")}</div>
-      <div class="et"><div class="t">${place?.name || e.title}</div></div>
+      <div class="et"><div class="t">${eventLabel(e)}</div></div>
       <button class="skip-btn" onclick="event.stopPropagation();openOverrideModal(${e._idx})" title="調整此行程">✕</button>
     </div>`;
   }).join("")}</div>` : "";
@@ -896,7 +900,6 @@ function renderSheet(){
     : "";
   const collapsed = document.getElementById("sheetCollapsed");
   if(focusEvent){
-    const place = focusEvent.place ? TRIP_DATA.places[focusEvent.place] : null;
     const modeChip = isNextFocus ? `<span class="badge pending">${MODE_EMOJI[focusEvent.mode]||"🧭"} 下一站</span>` : `<span class="badge confirmed">現在</span>`;
     const voucher = findVoucher(dayObj.day, focusEvent);
     const vChipHtml = (voucher && voucher.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${voucher.code}')">🎫 ${voucher.code}<span>複製</span></div>` : "";
@@ -904,7 +907,7 @@ function renderSheet(){
       <div class="cur-row">
         <div class="thumb type-${catOf(focusEvent.type)}">${TYPE_ICON[focusEvent.type]||"📍"}${placePhoto(focusEvent.place,"thumb-img")}</div>
         <div class="cur-info">
-          <div class="name">${place?.name || focusEvent.title}</div>
+          <div class="name">${eventLabel(focusEvent)}</div>
           <div class="meta">${focusEvent.time} ${modeChip} ${statusBadge(focusEvent)}</div>
           ${cdHtml}
           ${vChipHtml}
@@ -914,11 +917,10 @@ function renderSheet(){
       ${upcomingHtml}
     `;
   } else {
-    const place = next?.place ? TRIP_DATA.places[next.place] : null;
     const nv = next ? findVoucher(dayObj.day, next) : null;
     const nvHtml = (nv && nv.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${nv.code}')">🎫 ${nv.code}<span>複製</span></div>` : "";
     const notStartedLabel = dayObj.date===todayStr() ? "今日行程尚未開始" : "行程尚未開始";
-    collapsed.innerHTML = `<div class="cur-info"><div class="name">${notStartedLabel}</div>${next ? `<div class="meta">${next.time} ${place?.name || next.title}</div>` : ""}${cdHtml}${nvHtml}</div>`;
+    collapsed.innerHTML = `<div class="cur-info"><div class="name">${notStartedLabel}</div>${next ? `<div class="meta">${next.time} ${eventLabel(next)}</div>` : ""}${cdHtml}${nvHtml}</div>`;
   }
 
   // expanded list
@@ -945,13 +947,10 @@ function renderSheet(){
   let prevEvent = null;
   all.forEach((e,i)=>{
     html += transitConnectorHtml(prevEvent, e, dayObj);
-    const place = e.place ? TRIP_DATA.places[e.place] : null;
     const skipped = e.override && e.override.status==="skip";
     const cat = catOf(e.type);
     const icon = cat==="transit" ? (MODE_EMOJI[e.mode] || TYPE_ICON[e.type] || "📍") : (TYPE_ICON[e.type]||"📍");
-    // 交通/物流列一律顯示事件自己的標題（例如「ecbo cloak 行李寄放」），不要被連結的
-    // place 名稱蓋掉——否則「去HOSTEL LUND寄放行李」會被誤讀成「入住HOSTEL LUND」
-    const label = (cat==="transit" || e.type==="logistics") ? e.title : (place?.name || e.title);
+    const label = eventLabel(e);
     const durHtml = (e.duration!=null && cat!=="transit") ? `<span class="dur-chip">🕐 停留約${durationLabel(e.duration)}</span>` : "";
     html += `<div class="event-row type-${cat} ${skipped?'skipped':''} ${staggerPending?'stagger':''}"${staggerPending?` style="animation-delay:${i*35}ms"`:""} onclick="handleEventTap(${e._idx})" ontouchstart="startLongPress(${e._idx})" ontouchend="cancelLongPress()" onmousedown="startLongPress(${e._idx})" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()">
       <div class="time">${e.time}</div>
