@@ -97,6 +97,7 @@
   .badge.pending{background:#FBEAD3;color:var(--orange);}
   .badge.optional{background:#EEE9E0;color:var(--gray2);}
   .badge.skip{background:#EEE9E0;color:var(--gray2);text-decoration:line-through;}
+  .dur-chip{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-left:6px;background:#EFE7DC;color:var(--ink-soft);}
   .go-btn{background:var(--accent);color:#fff;border:none;border-radius:14px;padding:10px 16px;font-weight:900;font-size:13px;flex:none;
     box-shadow:0 4px 14px rgba(212,72,32,.4);animation:pulse 1.8s infinite;cursor:pointer;}
   @keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.05);}}
@@ -562,6 +563,7 @@ function minutesUntil(hm){
   return h*60+m - (d.getUTCHours()*60+d.getUTCMinutes());
 }
 function hmToMin(hm){ const [h,m] = hm.split(":").map(Number); return h*60+m; }
+function durationLabel(mins){ return mins>=60 ? `${Math.floor(mins/60)}小時${mins%60?(mins%60)+"分":""}` : `${mins}分`; }
 function eventTz(e){ return (e.coord && e.coord[0] < 30) ? "+08:00" : "+09:00"; }
 function eventEpoch(dayObj, e){ return new Date(dayObj.date+"T"+e.time+":00"+eventTz(e)).getTime(); }
 function minutesUntilEv(dayObj, e){ return Math.round((eventEpoch(dayObj, e) - nowEpoch())/60000); }
@@ -950,11 +952,12 @@ function renderSheet(){
     // 交通/物流列一律顯示事件自己的標題（例如「ecbo cloak 行李寄放」），不要被連結的
     // place 名稱蓋掉——否則「去HOSTEL LUND寄放行李」會被誤讀成「入住HOSTEL LUND」
     const label = (cat==="transit" || e.type==="logistics") ? e.title : (place?.name || e.title);
+    const durHtml = (e.duration!=null && cat!=="transit") ? `<span class="dur-chip">🕐 停留約${durationLabel(e.duration)}</span>` : "";
     html += `<div class="event-row type-${cat} ${skipped?'skipped':''} ${staggerPending?'stagger':''}"${staggerPending?` style="animation-delay:${i*35}ms"`:""} onclick="handleEventTap(${e._idx})" ontouchstart="startLongPress(${e._idx})" ontouchend="cancelLongPress()" onmousedown="startLongPress(${e._idx})" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()">
       <div class="time">${e.time}</div>
       <div class="thumb-sm">${icon}${placePhoto(e.place,"thumb-sm-img")}</div>
       <div class="et">
-        <div class="t">${label} ${statusBadge(e)}</div>
+        <div class="t">${label} ${statusBadge(e)} ${durHtml}</div>
         <div class="n">${e.note||""}</div>
       </div>
     </div>`;
