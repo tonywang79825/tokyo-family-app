@@ -23,8 +23,9 @@ self.addEventListener("fetch", (e) => {
   // 天氣 API：純網路，離線時由前端 try/catch 靜默處理
   if (url.hostname === "api.open-meteo.com") return;
 
-  // 同源（app shell）：網路優先，離線退回快取 → 部署更新能即時生效
-  if (url.origin === location.origin) {
+  // 同源（app shell）與 Supabase（行程資料）：網路優先，離線退回快取 → 資料改完 sync 後手機能即時看到最新版本，
+  // 不能跟下面地圖磚/CDN共用「快取優先」，那樣改了資料還是會先看到舊的快取
+  if (url.origin === location.origin || url.hostname.endsWith(".supabase.co")) {
     e.respondWith(
       fetch(req)
         .then((res) => {

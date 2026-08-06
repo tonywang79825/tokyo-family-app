@@ -116,21 +116,26 @@
   .thumb-sm-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
   .event-row .time{font-size:11px;color:var(--ink-soft);width:36px;flex:none;}
   .event-row .et{flex:1;min-width:0;}
-  .event-row .et .t{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .event-row .et .n{font-size:11px;color:var(--ink-soft);}
+  .event-row .et .t{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .event-row .et .meta{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px;}
+  .event-row .et .meta .badge,.event-row .et .meta .dur-chip{margin-left:0;}
+  .event-row .et .n{font-size:11.5px;color:var(--ink-soft);margin-top:3px;line-height:1.4;}
   .event-row.skipped .t{text-decoration:line-through;color:var(--gray2);}
   .sheet-list .event-row.stagger{animation:rowIn .32s ease-out backwards;}
-  /* 行程分類：景點/餐廳/住宿為主卡片（淡底色 + 左側色條 + 圖示上色，卡片間用間距分開），
-     交通為中間縮小的虛線連接列，串在卡片之間 */
-  .event-row.type-sight,.event-row.type-meal,.event-row.type-stay{border-radius:12px;border-bottom:none;margin-bottom:3px;}
-  .event-row.type-sight{background:rgba(212,72,32,.05);border-left-color:var(--accent);}
+  /* 行程分類：景點/餐廳/住宿為主卡片（白底 + 左側色條 + 圖示上色，卡片間用較大間距分開，
+     不再用大面積色塊底色，靠色條+圖示色就夠分辨類別，減少視覺噪音），
+     交通為中間縮小、淡化、獨立留白的虛線連接列，跟卡片明顯分開 */
+  .event-row.type-sight,.event-row.type-meal,.event-row.type-stay{
+    border-radius:14px;border-bottom:none;margin-bottom:10px;padding:12px 10px;
+    background:var(--paper);border:1px solid var(--paper-2);}
+  .event-row.type-sight{border-left:4px solid var(--accent);}
   .event-row.type-sight .thumb-sm{background:rgba(212,72,32,.14);color:var(--accent);}
-  .event-row.type-meal{background:rgba(200,122,61,.07);border-left-color:var(--cat-meal);}
+  .event-row.type-meal{border-left:4px solid var(--cat-meal);}
   .event-row.type-meal .thumb-sm{background:rgba(200,122,61,.16);color:var(--cat-meal);}
-  .event-row.type-stay{background:rgba(62,122,120,.16);border-left-color:var(--cat-stay);border-left-width:5px;}
+  .event-row.type-stay{background:rgba(62,122,120,.08);border-left:5px solid var(--cat-stay);}
   .event-row.type-stay .thumb-sm{background:rgba(62,122,120,.26);color:var(--cat-stay);width:44px;height:44px;font-size:19px;}
   .event-row.type-stay .et .t{color:var(--cat-stay);}
-  .event-row.type-transit{padding:3px 4px 3px 8px;border-left-style:dashed;border-left-color:var(--cat-transit);border-bottom:none;opacity:.8;}
+  .event-row.type-transit{padding:3px 4px 3px 8px;margin:6px 0;border-left-style:dashed;border-left-color:var(--cat-transit);border-bottom:none;opacity:.7;}
   .event-row.type-transit .thumb-sm{width:24px;height:24px;font-size:12px;border-radius:50%;background:transparent;color:var(--cat-transit);}
   .event-row.type-transit .time{font-size:10px;width:32px;}
   .event-row.type-transit .et .t{font-size:12px;font-weight:500;color:var(--ink-soft);}
@@ -142,6 +147,12 @@
     background:#FDF3E7;border:1.5px dashed var(--accent);font-family:ui-monospace,monospace;font-size:12px;font-weight:800;
     color:var(--accent-dark);cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .v-chip span{background:var(--accent);color:#fff;border-radius:7px;padding:2px 7px;font-size:10px;font-family:'Noto Sans TC',sans-serif;flex:none;}
+  .next-hint{display:flex;align-items:center;gap:8px;margin-top:10px;padding:7px 8px;border-radius:12px;background:var(--paper-2);cursor:pointer;}
+  .next-hint .thumb-sm{width:32px;height:32px;border-radius:9px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex:none;position:relative;overflow:hidden;}
+  .next-hint .et{flex:1;min-width:0;}
+  .next-hint .et .t{font-size:12px;font-weight:700;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .next-hint .et .n{font-size:11px;color:var(--gray2);}
+  .go-btn-sm{padding:6px 12px;font-size:11px;border-radius:10px;box-shadow:none;animation:none;}
 
   /* ---------- Modal / sheets ---------- */
   .overlay-backdrop{position:fixed;inset:0;background:rgba(46,40,34,.45);z-index:700;opacity:0;pointer-events:none;transition:opacity .2s;}
@@ -231,16 +242,6 @@
   #daySplash{position:fixed;inset:0;z-index:900;display:none;align-items:center;justify-content:center;flex-direction:column;
     background:rgba(46,40,34,.55);backdrop-filter:blur(4px);pointer-events:none;}
   #daySplash.show{display:flex;animation:splash 1.6s ease forwards;}
-  /* 只答「現在在哪」一件事,單行、壓低高度盡量少擋地圖。固定 left/right（不用 fit-content 置中）——
-     FAB 整併進選單後,這個高度右側已經沒有按鈕擋著,right 可以跟其他元素一樣貼 14px */
-  #bigCountdown{position:fixed;top:calc(env(safe-area-inset-top,0px) + 172px);left:12px;right:14px;z-index:450;
-    background:var(--paper);border-radius:16px;box-shadow:0 6px 24px rgba(46,40,34,.28);padding:6px 4px;
-    display:flex;align-items:center;gap:2px;pointer-events:none;}
-  #bigCountdown .bc-content{flex:1;min-width:0;text-align:center;font-size:18px;font-weight:900;line-height:1.3;
-    color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  #bigCountdown .bc-arrow{flex:none;pointer-events:auto;background:none;border:none;font-size:24px;line-height:1;font-weight:900;
-    color:var(--ink-soft);padding:6px 10px;cursor:pointer;}
-  #bigCountdown .bc-arrow:active{color:var(--accent);}
   #daySplash .d{font-size:19px;color:#fff;opacity:.85;font-weight:700;letter-spacing:3px;}
   #daySplash .t{font-size:30px;color:#fff;font-weight:900;margin-top:8px;text-align:center;padding:0 24px;}
   @keyframes splash{0%{opacity:0;}12%{opacity:1;}75%{opacity:1;}100%{opacity:0;}}
@@ -305,11 +306,6 @@
 <button class="fab fab-compass" id="fabCompass" title="回到當前地點">🧭</button>
 <div id="toast"></div>
 <div id="daySplash"></div>
-<div id="bigCountdown" style="display:none;">
-  <button class="bc-arrow bc-prev" id="bcPrev" title="上一個景點">‹</button>
-  <div class="bc-content" id="bcContent"></div>
-  <button class="bc-arrow bc-next" id="bcNext" title="下一個景點">›</button>
-</div>
 
 <div class="sheet" id="sheet">
   <div class="sheet-handle" id="sheetHandle"></div>
@@ -639,8 +635,6 @@ function getCurrentAndNextEvent(dayObj){
 // 真正的值在 startApp() 一開始（TRIP_DATA 已確定有資料）才重新計算。
 let selectedDayNum = 1;
 let autoFollowToday = true;
-// 手動用上一個/下一個景點瀏覽時的索引（該日事件陣列的位置）。null = 交給自動追蹤「現在」邏輯。
-let browseIdx = null;
 let map, markersLayer, polyline;
 let lastFocusedKey = null;
 let lastFitDay = null;
@@ -670,31 +664,6 @@ function renderStatus(){
   }
   checkHardDeadlines();
   liveVehicleTick();
-  bigCountdownTick();
-}
-
-// 頂部卡片只答「現在在哪」一件事：headline 優先顯示 current,今天還沒開始/沒有current時退回顯示 next 自己的名字。
-// 倒數改放到底部卡片（放大顯示）,這裡不重複、也盡量壓低卡片高度少擋地圖。
-// browseIdx 有值時（使用者正在用 ‹/› 手動翻景點）,headline 改成瀏覽到的那個景點,不受「今天/現在」限制。
-function bigCountdownTick(){
-  const el = document.getElementById("bigCountdown");
-  const content = document.getElementById("bcContent");
-  const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
-  if(!dayObj){ el.style.display="none"; return; }
-  let headline;
-  if(browseIdx!=null){
-    const events = browsableEvents(dayObj);
-    headline = events[browseIdx];
-    if(!headline){ browseIdx=null; }
-  }
-  if(browseIdx==null){
-    if(dayObj.date !== todayStr()){ el.style.display="none"; return; }
-    const {current, next} = getCurrentAndNextEvent(dayObj);
-    headline = current || next;
-  }
-  if(!headline){ el.style.display="none"; return; }
-  content.textContent = eventLabel(headline);
-  el.style.display = "flex";
 }
 
 function renderDayChips(){
@@ -704,7 +673,7 @@ function renderDayChips(){
     const chip = document.createElement("div");
     chip.className = "chip" + (d.day===selectedDayNum ? " active":"");
     chip.innerHTML = `D${d.day}<span class="d">${d.date.slice(5).replace('-','/')}</span>`;
-    chip.onclick = ()=>{ selectedDayNum=d.day; autoFollowToday=false; browseIdx=null; staggerPending=true; renderAll(); };
+    chip.onclick = ()=>{ selectedDayNum=d.day; autoFollowToday=false; staggerPending=true; renderAll(); };
     el.appendChild(chip);
   });
 }
@@ -779,9 +748,7 @@ function renderMap(dayObj, currentEvent){
   if(passedLine){ map.removeLayer(passedLine); passedLine=null; }
   const dayChanged = lastFitDay !== dayObj.day;
   const events = eventsWithOverrides(dayObj.day, getDayEvents(dayObj)).filter(e=> !(e.override && e.override.status==="skip"));
-  // 手動瀏覽景點時（browseIdx有值),放大/浮動的「here」樣式跟著瀏覽到的景點走,不是實際的現在時間點
-  const browsedTarget = browseIdx!=null ? browsableEvents(dayObj)[browseIdx] : null;
-  const hereTarget = browsedTarget || currentEvent;
+  const hereTarget = currentEvent;
   const pts = [];
   let hereIdx = -1;
   events.forEach((e)=>{
@@ -792,8 +759,9 @@ function renderMap(dayObj, currentEvent){
     const seq = pts.length + 1;
     pts.push(ll);
     const minor = !e.place;
+    const markerEmoji = catOf(e.type)==="transit" ? (MODE_EMOJI[e.mode] || TYPE_ICON[e.type] || "📍") : (TYPE_ICON[e.type]||"📍");
     const marker = L.marker(ll, {
-      icon: makeIcon(TYPE_ICON[e.type]||"📍", isHere, dayChanged ? seq*70 : null, minor, e.place),
+      icon: makeIcon(markerEmoji, isHere, dayChanged ? seq*70 : null, minor, e.place),
       zIndexOffset: isHere ? 1000 : 0
     }).addTo(markersLayer);
     const place = e.place ? TRIP_DATA.places[e.place] : null;
@@ -817,9 +785,9 @@ function renderMap(dayObj, currentEvent){
   updateMarkerScale();
 }
 
-// 頂部固定 UI（標題列＋日期chip＋倒數卡）大約蓋住畫面上方 260px，
+// 頂部固定 UI（標題列＋日期chip，倒數卡已移除）大約蓋住畫面上方 130px，
 // 聚焦到「現在在這」的放大 marker 時要把目標點往下推，不然 marker 上半會被蓋住。
-const FOCUS_TOP_OFFSET_PX = 130;
+const FOCUS_TOP_OFFSET_PX = 65;
 function offsetFocusTarget(ll, zoom){
   if(!map || !ll) return ll;
   const pt = map.project(ll, zoom);
@@ -829,37 +797,12 @@ function offsetFocusTarget(ll, zoom){
 }
 
 function focusCurrent(){
-  browseIdx = null;
   const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
   const {current} = getCurrentAndNextEvent(dayObj);
   if(current){
     const ll = eventCoord(current);
     if(ll) map.setView(offsetFocusTarget(ll, 15), 15, {animate:true});
   }
-  bigCountdownTick();
-}
-
-// 上一個/下一個景點瀏覽：在當天「有座標」的事件之間循環,地圖飛過去、頂部卡片改顯示該景點名稱。
-// 跟自動追蹤「現在」互不干擾——只有明確按下 focusCurrent（🧭）或換日才會清掉 browseIdx 回到自動模式。
-function browsableEvents(dayObj){
-  return eventsWithOverrides(dayObj.day, getDayEvents(dayObj))
-    .filter(e=> !(e.override && e.override.status==="skip") && eventCoord(e));
-}
-function browsePlace(delta){
-  const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
-  const events = browsableEvents(dayObj);
-  if(!events.length) return;
-  let base = browseIdx;
-  if(base==null){
-    const {current} = getCurrentAndNextEvent(dayObj);
-    const startIdx = current ? events.findIndex(e=>e._idx===current._idx) : -1;
-    base = startIdx>=0 ? startIdx : 0;
-  }
-  browseIdx = (base + delta + events.length) % events.length;
-  renderAll(); // 先重畫 marker（讓瀏覽到的景點套用放大/浮動樣式),再讓地圖飛過去,兩者才會同步
-  const target = events[browseIdx];
-  const ll = eventCoord(target);
-  if(ll) map.flyTo(ll, 15, {duration:1}); // 瀏覽模式要求正中央,不套用 offsetFocusTarget 的往下偏移
 }
 
 /* =========================================================
@@ -878,11 +821,12 @@ function renderSheet(){
   const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
   const {current, next, nextNext, all} = getCurrentAndNextEvent(dayObj);
 
-  // 底部卡片一律主打「下一站」（含 GO 按鈕導去下一站），只有今天已經沒有下一站時才退回顯示 current。
-  // 「現在在哪」交給頂部的 bigCountdown 卡負責，這裡不重複。
-  const focusEvent = next || current;
-  const isNextFocus = !!next;
-  const upcoming = (isNextFocus ? [nextNext] : []).filter(Boolean);
+  // 底部卡片主打「現在在哪」：有 current 就是主角（大卡片＋自己的憑證），
+  // next 縮成一列小提示＋GO按鈕負責導去下一站；今天還沒開始（沒有current）才退回主打 next。
+  const mainEvent = current || next;
+  const isCurrentMain = !!current;
+  const hintEvent = isCurrentMain ? next : null;
+  const upcoming = [nextNext].filter(Boolean);
   const upcomingHtml = upcoming.length ? `<div class="upcoming-list">${upcoming.map(e=>{
     const cat = catOf(e.type);
     const icon = cat==="transit" ? (MODE_EMOJI[e.mode] || TYPE_ICON[e.type] || "📍") : (TYPE_ICON[e.type]||"📍");
@@ -894,27 +838,42 @@ function renderSheet(){
     </div>`;
   }).join("")}</div>` : "";
 
-  // collapsed：focusEvent 本身就是下一站時，倒數行不用再講一次「下一站」，只講還剩多少時間
-  const mins = isNextFocus ? minutesUntil(focusEvent.time) : null;
-  const cdHtml = (mins!=null && mins>0)
-    ? `<div class="countdown ${mins<=15?'urgent':''}">⏳ 還有 <b>${mins>=60 ? Math.floor(mins/60)+" 小時 "+(mins%60)+" 分" : mins+" 分"}</b></div>`
+  // 大卡片的倒數：只有「還沒到達 mainEvent」（mainEvent 其實是 next）時才顯示，
+  // 已經在 current 現場就不用倒數，倒數改放到下面的下一站小提示列。
+  const mainMins = !isCurrentMain ? minutesUntil(mainEvent?.time) : null;
+  const cdHtml = (mainMins!=null && mainMins>0)
+    ? `<div class="countdown ${mainMins<=15?'urgent':''}">⏳ 還有 <b>${mainMins>=60 ? Math.floor(mainMins/60)+" 小時 "+(mainMins%60)+" 分" : mainMins+" 分"}</b></div>`
+    : "";
+  const hintMins = hintEvent ? minutesUntil(hintEvent.time) : null;
+  const hintCdText = (hintMins!=null && hintMins>0)
+    ? `⏳ 還有 ${hintMins>=60 ? Math.floor(hintMins/60)+" 小時 "+(hintMins%60)+" 分" : hintMins+" 分"}`
     : "";
   const collapsed = document.getElementById("sheetCollapsed");
-  if(focusEvent){
-    const modeChip = isNextFocus ? `<span class="badge pending">${MODE_EMOJI[focusEvent.mode]||"🧭"} 下一站</span>` : `<span class="badge confirmed">現在</span>`;
-    const voucher = findVoucher(dayObj.day, focusEvent);
+  if(mainEvent){
+    const modeChip = !isCurrentMain ? `<span class="badge pending">${MODE_EMOJI[mainEvent.mode]||"🧭"} 下一站</span>` : `<span class="badge confirmed">現在</span>`;
+    const voucher = findVoucher(dayObj.day, mainEvent);
     const vChipHtml = (voucher && voucher.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${voucher.code}')">🎫 ${voucher.code}<span>複製</span></div>` : "";
+    const hintHtml = hintEvent ? `
+      <div class="next-hint" onclick="openRouteModal(${hintEvent._idx})">
+        <div class="thumb-sm">${MODE_EMOJI[hintEvent.mode]||TYPE_ICON[hintEvent.type]||"📍"}${placePhoto(hintEvent.place,"thumb-sm-img")}</div>
+        <div class="et">
+          <div class="t">下一站・${hintEvent.time} ${eventLabel(hintEvent)}</div>
+          ${hintCdText ? `<div class="n">${hintCdText}</div>` : ""}
+        </div>
+        <button class="go-btn go-btn-sm" onclick="event.stopPropagation();openRouteModal(${hintEvent._idx})">GO →</button>
+      </div>` : "";
     collapsed.innerHTML = `
       <div class="cur-row">
-        <div class="thumb type-${catOf(focusEvent.type)}">${TYPE_ICON[focusEvent.type]||"📍"}${placePhoto(focusEvent.place,"thumb-img")}</div>
+        <div class="thumb type-${catOf(mainEvent.type)}">${TYPE_ICON[mainEvent.type]||"📍"}${placePhoto(mainEvent.place,"thumb-img")}</div>
         <div class="cur-info">
-          <div class="name">${eventLabel(focusEvent)}</div>
-          <div class="meta">${focusEvent.time} ${modeChip} ${statusBadge(focusEvent)}</div>
+          <div class="name">${eventLabel(mainEvent)}</div>
+          <div class="meta">${mainEvent.time} ${modeChip} ${statusBadge(mainEvent)}</div>
           ${cdHtml}
           ${vChipHtml}
         </div>
-        ${eventCoord(focusEvent) ? `<button class="go-btn" onclick="openRouteModal(${focusEvent._idx})">GO →</button>` : ""}
+        ${(!isCurrentMain && eventCoord(mainEvent)) ? `<button class="go-btn" onclick="openRouteModal(${mainEvent._idx})">GO →</button>` : ""}
       </div>
+      ${hintHtml}
       ${upcomingHtml}
     `;
   } else {
@@ -953,12 +912,15 @@ function renderSheet(){
     const icon = cat==="transit" ? (MODE_EMOJI[e.mode] || TYPE_ICON[e.type] || "📍") : (TYPE_ICON[e.type]||"📍");
     const label = eventLabel(e);
     const durHtml = (e.duration!=null && cat!=="transit") ? `<span class="dur-chip">🕐 停留約${durationLabel(e.duration)}</span>` : "";
+    // 交通類事件如果沒寫 note，退回用 steps 自動組摘要，不要讓「怎麼去、多久」整個空白。
+    const noteText = e.note || (cat==="transit" ? stepsSummaryText(e.steps) : "");
     html += `<div class="event-row type-${cat} ${skipped?'skipped':''} ${staggerPending?'stagger':''}"${staggerPending?` style="animation-delay:${i*35}ms"`:""} onclick="handleEventTap(${e._idx})" ontouchstart="startLongPress(${e._idx})" ontouchend="cancelLongPress()" onmousedown="startLongPress(${e._idx})" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()">
       <div class="time">${e.time}</div>
       <div class="thumb-sm">${icon}${placePhoto(e.place,"thumb-sm-img")}</div>
       <div class="et">
-        <div class="t">${label} ${statusBadge(e)} ${durHtml}</div>
-        <div class="n">${e.note||""}</div>
+        <div class="t">${label}</div>
+        ${(statusBadge(e) || durHtml) ? `<div class="meta">${statusBadge(e)}${durHtml}</div>` : ""}
+        ${noteText ? `<div class="n">${noteText}</div>` : ""}
       </div>
     </div>`;
     prevEvent = e;
@@ -997,7 +959,7 @@ function initSheetDrag(){
   };
   handle.addEventListener("click", toggle);
   document.getElementById("sheetCollapsed").addEventListener("click", (ev)=>{
-    if(ev.target.closest(".go-btn") || ev.target.closest(".event-row") || ev.target.closest(".v-chip")) return;
+    if(ev.target.closest(".go-btn") || ev.target.closest(".event-row") || ev.target.closest(".v-chip") || ev.target.closest(".next-hint")) return;
     toggle();
   });
   handle.addEventListener("touchstart", e=>{ startY=e.touches[0].clientY; dragging=true; });
@@ -1102,7 +1064,7 @@ function openRouteModal(idx){
   const fromEv = idx>0 ? events[idx-1] : null;
   const p = e.place ? TRIP_DATA.places[e.place] : null;
   const el = document.getElementById("routeModal");
-  const modeInfo = (e.mode && fromEv) ? transitDetail(fromEv, e, dayObj) : null;
+  const modeInfo = e.mode ? transitDetail(fromEv, e, dayObj) : null;
   // 有結構化 steps 時線路資訊已在 steps 裡，泛用的 mode 列會重複，略過（班機無 steps 不受影響）
   const hasStructuredSteps = !!(e.steps && e.steps.some(s=>typeof s==="object"));
   const modeHtml = (modeInfo && !hasStructuredSteps) ? `<div class="step"><span class="ic">${MODE_EMOJI[e.mode]||"🧭"}</span><div><b>${modeInfo.label}</b>${modeInfo.note?`<br>${modeInfo.note}`:""}</div></div>` : "";
@@ -1229,6 +1191,16 @@ function arrivalPulse(ll){
 
 const MODE_EMOJI = {plane:"✈️", train:"🚃", taxi:"🚕", walk:"🚶", ferry:"⛴️", car:"🚗", bus:"🚌", gondola:"🚡"};
 const MODE_LABEL = {plane:"飛機", train:"電車", taxi:"計程車", walk:"步行", ferry:"渡輪", car:"開車", bus:"巴士", gondola:"纜車"};
+// 有結構化 steps、但沒寫 transitNote 摘要文字時的備用摘要（例如「🚃JR京濱東北線25分+🚶步行5分，共約30分」），
+// 讓「幾點出發、搭什麼、多久到」不用點進 GO 才看得到。
+function stepsSummaryText(steps){
+  if(!steps || !steps.length) return "";
+  const objs = steps.filter(s=>typeof s==="object" && s.min);
+  if(!objs.length) return "";
+  const parts = objs.map(s=>`${MODE_EMOJI[s.mode]||"🧭"}${s.line||MODE_LABEL[s.mode]||""}${s.min}分`);
+  const totalMin = objs.reduce((sum,s)=>sum+(s.min||0),0);
+  return parts.join("+") + (totalMin?`，共約${totalMin}分`:"");
+}
 // 班機事件配對 TRIP_DATA.trip.flights，補上航班號、起訖航廈與時間
 function flightDetailFor(e, dayObj){
   if(e.mode!=="plane") return null;
@@ -1247,7 +1219,7 @@ function transitDetail(fromEv, toEv, dayObj){
     const durTxt = (min && min>0) ? `，飛行約${Math.floor(min/60)}小時${min%60}分` : "";
     return {label: `${TRIP_DATA.trip.flights.airline} ${f.flightNo}`, note: `${f.from} ${f.fromTerminal} ${f.departure.slice(11)} → ${f.to} ${f.toTerminal} ${f.arrival.slice(11)}${durTxt}`};
   }
-  return {label: MODE_LABEL[toEv.mode] || toEv.mode, note: toEv.transitNote || ""};
+  return {label: MODE_LABEL[toEv.mode] || toEv.mode, note: toEv.transitNote || stepsSummaryText(toEv.steps)};
 }
 // 兩張主卡片（景點/餐廳/住宿）之間若沒有獨立的交通事件，就補一列縮小的交通方式連接列，
 // 用抵達事件既有的 mode 欄位呈現，避免景點與景點之間看起來憑空移動；點擊可看詳細乘車資訊
@@ -1392,7 +1364,7 @@ function focusOnCurrentChange(dayObj, current, next, heading){
 function renderAll(){
   if(autoFollowToday){
     const todayNum = getCurrentTripDay();
-    if(todayNum) selectedDayNum = todayNum;
+    if(todayNum !== null) selectedDayNum = todayNum;
   }
   renderStatus();
   renderDayChips();
@@ -1483,8 +1455,6 @@ function closeMenu(){ document.getElementById("menuPanel").classList.remove("sho
 function startApp(){
   selectedDayNum = getCurrentTripDay() ?? 1;
   document.getElementById("fabCompass").onclick = focusCurrent;
-  document.getElementById("bcPrev").onclick = ()=>browsePlace(-1);
-  document.getElementById("bcNext").onclick = ()=>browsePlace(1);
   document.getElementById("fabMenuBtn").onclick = (ev)=>{ ev.stopPropagation(); toggleMenu(); };
   document.addEventListener("click", (ev)=>{
     const panel = document.getElementById("menuPanel");
