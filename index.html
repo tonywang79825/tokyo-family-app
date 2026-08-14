@@ -226,10 +226,11 @@
   @keyframes ant-march{to{stroke-dashoffset:-14;}}
   .marker-dot{width:78px;height:78px;border-radius:50%;background:var(--paper);border:6px solid #A89F91;display:flex;align-items:center;justify-content:center;
     font-size:36px;box-shadow:0 2px 6px rgba(0,0,0,.25);position:relative;transform-origin:50% 50%;transform:scale(var(--mzoom,1));transition:transform .3s ease;}
+  .marker-dot.has-photo{background:none;border:none;box-shadow:none;}
   .marker-dot.here{z-index:999 !important;border-color:var(--green);animation:markerDotGrow .35s ease-out forwards, floatDot 2s ease-in-out .35s infinite;filter:drop-shadow(0 6px 18px rgba(46,125,50,.5));}
   @keyframes markerDotGrow{0%{transform:translateY(0) scale(var(--mzoom,1));}100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}}
   @keyframes floatDot{0%,100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}50%{transform:translateY(-6px) scale(calc(var(--mzoom,1) * 2.36));}}
-  .vehicle{font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));}
+  .vehicle{font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));position:relative;width:34px;height:34px;display:flex;align-items:center;justify-content:center;}
   .pulse-ring{width:10px;height:10px;border-radius:50%;position:relative;}
   .pulse-ring::before,.pulse-ring::after{content:"";position:absolute;inset:0;border-radius:50%;border:3px solid var(--accent);animation:ring 1.2s ease-out forwards;}
   .pulse-ring::after{animation-delay:.3s;}
@@ -729,7 +730,6 @@ function markerArt(key){
   return (key && !imgFailed.has("p:"+key)) ? `<img class="mk-img" src="assets/places/${key}.png" onerror="imgFail(this,'p:${key}')">` : "";
 }
 // 交通方式（走路/電車/計程車…）也可以有專屬插畫，跟地點照片同一套機制：assets/modes/{mode}.png，缺圖退回 emoji。
-// 只用在列表縮圖／下一站小提示這幾處大圖示位置，地圖上的小 marker-dot 太小放照片看不清楚，維持純 emoji。
 function modeArt(mode, cls){
   return (mode && !imgFailed.has("m:"+mode)) ? `<img class="${cls}" src="assets/modes/${mode}.png" onerror="imgFail(this,'m:${mode}')">` : "";
 }
@@ -743,10 +743,9 @@ function transitArt(e, cls){
   return modeArt(e.mode, cls) + (e.lineKey ? lineArt(e.lineKey, cls) : "");
 }
 
-function makeIcon(emoji, isHere, dropDelay, minor, placeKey){
-  const hasPhoto = !minor && placeKey && !imgFailed.has("p:"+placeKey);
-  const cls = (minor ? "marker-dot" : "marker-pin") + (hasPhoto ? " has-photo" : "");
-  const pin = `<div class="${cls} ${isHere?'here':''}">${emoji}${minor?"":markerArt(placeKey)}</div>`;
+function makeIcon(emoji, isHere, dropDelay, minor, artHtml, hasArt){
+  const cls = (minor ? "marker-dot" : "marker-pin") + (hasArt ? " has-photo" : "");
+  const pin = `<div class="${cls} ${isHere?'here':''}">${emoji}${artHtml||""}</div>`;
   return L.divIcon({
     className:"leaflet-div-icon",
     html: dropDelay!=null ? `<div class="marker-drop" style="animation-delay:${dropDelay}ms">${pin}</div>` : pin,
@@ -773,9 +772,12 @@ function renderMap(dayObj, currentEvent){
     const seq = pts.length + 1;
     pts.push(ll);
     const minor = !e.place;
-    const markerEmoji = catOf(e.type)==="transit" ? (MODE_EMOJI[e.mode] || TYPE_ICON[e.type] || "📍") : (TYPE_ICON[e.type]||"📍");
+    const isTransitEvt = catOf(e.type)==="transit";
+    const markerEmoji = isTransitEvt ? (MODE_EMOJI[e.mode] || TYPE_ICON[e.type] || "📍") : (TYPE_ICON[e.type]||"📍");
+    const artHtml = minor ? (isTransitEvt ? transitArt(e,"mk-img") : "") : markerArt(e.place);
+    const hasArt = minor ? (isTransitEvt && e.mode && !imgFailed.has("m:"+e.mode)) : (!!e.place && !imgFailed.has("p:"+e.place));
     const marker = L.marker(ll, {
-      icon: makeIcon(markerEmoji, isHere, dayChanged ? seq*70 : null, minor, e.place),
+      icon: makeIcon(markerEmoji, isHere, dayChanged ? seq*70 : null, minor, artHtml, hasArt),
       zIndexOffset: isHere ? 1000 : 0
     }).addTo(markersLayer);
     const place = e.place ? TRIP_DATA.places[e.place] : null;
@@ -1326,7 +1328,7 @@ function liveVehicleTick(){
   if(!pos) return;
   const emoji = MODE_EMOJI[next.mode] || (dayObj.day>=5 ? "🚗" : "🚃");
   if(!liveVeh){
-    const icon = L.divIcon({className:"leaflet-div-icon", html:`<div class="vehicle">${emoji}</div>`, iconSize:[34,34], iconAnchor:[17,17]});
+    const icon = L.divIcon({className:"leaflet-div-icon", html:`<div class="vehicle">${emoji}${transitArt(next,"mk-img")}</div>`, iconSize:[34,34], iconAnchor:[17,17]});
     liveVeh = L.marker(pos, {icon, zIndexOffset:1100, interactive:false}).addTo(map);
   } else liveVeh.setLatLng(pos);
   if(frac>=1 && !livePulsed){ livePulsed=true; arrivalPulse(to); }
