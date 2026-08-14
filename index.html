@@ -728,6 +728,20 @@ function placePhoto(key, cls){
 function markerArt(key){
   return (key && !imgFailed.has("p:"+key)) ? `<img class="mk-img" src="assets/places/${key}.png" onerror="imgFail(this,'p:${key}')">` : "";
 }
+// 交通方式（走路/電車/計程車…）也可以有專屬插畫，跟地點照片同一套機制：assets/modes/{mode}.png，缺圖退回 emoji。
+// 只用在列表縮圖／下一站小提示這幾處大圖示位置，地圖上的小 marker-dot 太小放照片看不清楚，維持純 emoji。
+function modeArt(mode, cls){
+  return (mode && !imgFailed.has("m:"+mode)) ? `<img class="${cls}" src="assets/modes/${mode}.png" onerror="imgFail(this,'m:${mode}')">` : "";
+}
+// 電車還可以再細分成實際的線名插畫（assets/lines/{lineKey}.png），疊在 modeArt 上面——
+// lineKey 圖片載入失敗會被移除，底下的 modeArt 圖片就會露出來，modeArt 也失敗才退回 emoji，三層疊加缺圖不會壞。
+// 只有已確認單一路線、資料夠明確的事件才會有 lineKey；多線混合或還沒確認清楚的維持只顯示通用電車圖。
+function lineArt(lineKey, cls){
+  return (lineKey && !imgFailed.has("l:"+lineKey)) ? `<img class="${cls}" src="assets/lines/${lineKey}.png" onerror="imgFail(this,'l:${lineKey}')">` : "";
+}
+function transitArt(e, cls){
+  return modeArt(e.mode, cls) + (e.lineKey ? lineArt(e.lineKey, cls) : "");
+}
 
 function makeIcon(emoji, isHere, dropDelay, minor, placeKey){
   const hasPhoto = !minor && placeKey && !imgFailed.has("p:"+placeKey);
@@ -832,7 +846,7 @@ function renderSheet(){
     const icon = cat==="transit" ? (MODE_EMOJI[e.mode] || TYPE_ICON[e.type] || "📍") : (TYPE_ICON[e.type]||"📍");
     return `<div class="event-row type-${cat}" onclick="handleEventTap(${e._idx})">
       <div class="time">${e.time}</div>
-      <div class="thumb-sm">${icon}${placePhoto(e.place,"thumb-sm-img")}</div>
+      <div class="thumb-sm">${icon}${cat==="transit" ? transitArt(e,"thumb-sm-img") : placePhoto(e.place,"thumb-sm-img")}</div>
       <div class="et"><div class="t">${eventLabel(e)}</div></div>
       <button class="skip-btn" onclick="event.stopPropagation();openOverrideModal(${e._idx})" title="調整此行程">✕</button>
     </div>`;
@@ -855,7 +869,7 @@ function renderSheet(){
     const vChipHtml = (voucher && voucher.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${voucher.code}')">🎫 ${voucher.code}<span>複製</span></div>` : "";
     const hintHtml = hintEvent ? `
       <div class="next-hint" onclick="openRouteModal(${hintEvent._idx})">
-        <div class="thumb-sm">${MODE_EMOJI[hintEvent.mode]||TYPE_ICON[hintEvent.type]||"📍"}${placePhoto(hintEvent.place,"thumb-sm-img")}</div>
+        <div class="thumb-sm">${MODE_EMOJI[hintEvent.mode]||TYPE_ICON[hintEvent.type]||"📍"}${catOf(hintEvent.type)==="transit" ? transitArt(hintEvent,"thumb-sm-img") : placePhoto(hintEvent.place,"thumb-sm-img")}</div>
         <div class="et">
           <div class="t">下一站・${hintEvent.time} ${eventLabel(hintEvent)}</div>
           ${hintCdText ? `<div class="n">${hintCdText}</div>` : ""}
@@ -916,7 +930,7 @@ function renderSheet(){
     const noteText = e.note || (cat==="transit" ? stepsSummaryText(e.steps) : "");
     html += `<div class="event-row type-${cat} ${skipped?'skipped':''} ${staggerPending?'stagger':''}"${staggerPending?` style="animation-delay:${i*35}ms"`:""} onclick="handleEventTap(${e._idx})" ontouchstart="startLongPress(${e._idx})" ontouchend="cancelLongPress()" onmousedown="startLongPress(${e._idx})" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()">
       <div class="time">${e.time}</div>
-      <div class="thumb-sm">${icon}${placePhoto(e.place,"thumb-sm-img")}</div>
+      <div class="thumb-sm">${icon}${cat==="transit" ? transitArt(e,"thumb-sm-img") : placePhoto(e.place,"thumb-sm-img")}</div>
       <div class="et">
         <div class="t">${label}</div>
         ${(statusBadge(e) || durHtml) ? `<div class="meta">${statusBadge(e)}${durHtml}</div>` : ""}
@@ -1230,7 +1244,7 @@ function transitConnectorHtml(fromEv, toEv, dayObj){
   const {label, note} = transitDetail(fromEv, toEv, dayObj);
   return `<div class="event-row type-transit synth-connector" onclick="openRouteModal(${toEv._idx})">
     <div class="time"></div>
-    <div class="thumb-sm">${icon}</div>
+    <div class="thumb-sm">${icon}${transitArt(toEv,"thumb-sm-img")}</div>
     <div class="et"><div class="t">${label}</div>${note?`<div class="n">${note}</div>`:""}</div>
   </div>`;
 }
