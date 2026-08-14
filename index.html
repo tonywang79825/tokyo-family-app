@@ -878,7 +878,7 @@ function renderSheet(){
       </div>` : "";
     collapsed.innerHTML = `
       <div class="cur-row">
-        <div class="thumb type-${catOf(mainEvent.type)}">${TYPE_ICON[mainEvent.type]||"📍"}${placePhoto(mainEvent.place,"thumb-img")}</div>
+        <div class="thumb type-${catOf(mainEvent.type)}">${TYPE_ICON[mainEvent.type]||"📍"}${catOf(mainEvent.type)==="transit" ? transitArt(mainEvent,"thumb-img") : placePhoto(mainEvent.place,"thumb-img")}</div>
         <div class="cur-info">
           <div class="name">${eventLabel(mainEvent)}</div>
           <div class="meta">${mainEvent.time} ${modeChip} ${statusBadge(mainEvent)}</div>
