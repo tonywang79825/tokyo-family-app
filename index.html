@@ -226,7 +226,6 @@
   @keyframes ant-march{to{stroke-dashoffset:-14;}}
   .marker-dot{width:78px;height:78px;border-radius:50%;background:var(--paper);border:6px solid #A89F91;display:flex;align-items:center;justify-content:center;
     font-size:36px;box-shadow:0 2px 6px rgba(0,0,0,.25);position:relative;transform-origin:50% 50%;transform:scale(var(--mzoom,1));transition:transform .3s ease;}
-  .marker-dot.has-photo{background:none;border:none;box-shadow:none;}
   .marker-dot.here{z-index:999 !important;border-color:var(--green);animation:markerDotGrow .35s ease-out forwards, floatDot 2s ease-in-out .35s infinite;filter:drop-shadow(0 6px 18px rgba(46,125,50,.5));}
   @keyframes markerDotGrow{0%{transform:translateY(0) scale(var(--mzoom,1));}100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}}
   @keyframes floatDot{0%,100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}50%{transform:translateY(-6px) scale(calc(var(--mzoom,1) * 2.36));}}
@@ -776,8 +775,10 @@ function renderMap(dayObj, currentEvent){
     const minor = !e.place;
     const isTransitEvt = catOf(e.type)==="transit";
     const markerEmoji = isTransitEvt ? (MODE_EMOJI[e.mode] || TYPE_ICON[e.type] || "📍") : (TYPE_ICON[e.type]||"📍");
-    const artHtml = minor ? (isTransitEvt ? transitArt(e,"mk-img") : "") : markerArt(e.place);
-    const hasArt = minor ? (isTransitEvt && e.mode && !imgFailed.has("m:"+e.mode)) : (!!e.place && !imgFailed.has("p:"+e.place));
+    // 固定地標的小圓點只用 emoji：交通工具插畫只該出現在跟著路線移動的即時載具圖示上，
+    // 兩者同時顯示會讓人誤以為有兩台車（一台卡在起點沒動、一台在路上跑）
+    const artHtml = minor ? "" : markerArt(e.place);
+    const hasArt = minor ? false : (!!e.place && !imgFailed.has("p:"+e.place));
     const marker = L.marker(ll, {
       icon: makeIcon(markerEmoji, isHere, dayChanged ? seq*70 : null, minor, artHtml, hasArt),
       zIndexOffset: isHere ? 1000 : 0
