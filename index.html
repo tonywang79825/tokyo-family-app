@@ -1384,7 +1384,10 @@ function focusOnCurrentChange(dayObj, current, next, heading){
     // 當作起點會在切換到不相干的新目標時，誤把鏡頭拉去涵蓋兩個不相干的點。
     const legFromLL = heading ? eventCoord(current) : null;
     const km = legFromLL ? distKm(legFromLL, ll) : (prevFocusLL ? distKm(prevFocusLL, ll) : 0);
-    if(legFromLL && km > 20){
+    // 門檻原本是 20km，橫濱球場→大井町(約19.7km)這種城市間移動剛好卡在門檻內側，
+    // 導致鏡頭直接飛到終點單點、完全看不到交通工具跟路線；改成跟另一個分支(換日/初載)
+    // 一致的 0.3km，只有幾乎原地不動（同一地點內）才不畫出發→抵達兩端
+    if(legFromLL && km > 0.3){
       map.flyToBounds([legFromLL, ll], {padding:[40,40], maxZoom:12, duration: Math.min(2.6, 1.2 + km/300)});
     } else {
       map.flyTo(offsetFocusTarget(ll, 15), 15, {duration: Math.min(2.6, 1.2 + km/80)});
