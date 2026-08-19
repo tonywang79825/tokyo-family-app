@@ -232,6 +232,7 @@
   .vehicle{font-size:32px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center;}
   .vehicle .v-art{position:absolute;inset:0;}
   .veh-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .vehicle:has(.veh-img) .v-emoji{visibility:hidden;}
   .pulse-ring{width:10px;height:10px;border-radius:50%;position:relative;}
   .pulse-ring::before,.pulse-ring::after{content:"";position:absolute;inset:0;border-radius:50%;border:3px solid var(--accent);animation:ring 1.2s ease-out forwards;}
   .pulse-ring::after{animation-delay:.3s;}
@@ -1356,7 +1357,7 @@ function liveVehicleTick(){
   const rotateStyle = bearing!=null ? ` style="transform:rotate(${((bearing-artBase+360)%360).toFixed(1)}deg)"` : "";
   const artHtml = modeArt(next.mode,"veh-img") + (next.lineKey ? lineArt(next.lineKey,"veh-img") : "");
   if(!liveVeh){
-    const icon = L.divIcon({className:"leaflet-div-icon", html:`<div class="vehicle">${emoji}<div class="v-art"${rotateStyle}>${artHtml}</div></div>`, iconSize:[44,44], iconAnchor:[22,22]});
+    const icon = L.divIcon({className:"leaflet-div-icon", html:`<div class="vehicle"><span class="v-emoji">${emoji}</span><div class="v-art"${rotateStyle}>${artHtml}</div></div>`, iconSize:[44,44], iconAnchor:[22,22]});
     liveVeh = L.marker(pos, {icon, zIndexOffset:1100, interactive:false}).addTo(map);
   } else {
     liveVeh.setLatLng(pos);
