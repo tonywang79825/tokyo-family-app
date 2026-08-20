@@ -42,13 +42,15 @@
     pointer-events:none;}
   .status-bar{display:flex;align-items:center;justify-content:space-between;pointer-events:auto;
     background:rgba(255,252,246,.85);backdrop-filter:blur(10px);border-radius:16px;padding:10px 14px;box-shadow:var(--shadow);margin-bottom:8px;}
+  .status-bar .left-group{display:flex;align-items:center;gap:8px;flex:1;min-width:0;}
   .status-bar .info{flex:1;min-width:0;}
+  #viewModeBtn{margin-left:0;}
   .status-bar .title{font-weight:900;font-size:15px;}
   .status-bar .sub{font-size:12px;color:var(--ink-soft);margin-top:2px;}
   .status-bar .clock{font-weight:700;font-size:14px;color:var(--accent);flex:none;}
   .menu-btn{flex:none;margin-left:10px;width:30px;height:30px;border-radius:9px;border:none;background:var(--paper-2);
     color:var(--ink);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-  .menu-panel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 56px);right:12px;z-index:520;
+  .menu-panel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 56px);right:12px;z-index:650;
     background:var(--paper);border-radius:16px;box-shadow:var(--shadow);padding:6px;display:none;flex-direction:column;min-width:170px;}
   .menu-panel.show{display:flex;}
   .menu-item{background:none;border:none;text-align:left;padding:10px 12px;border-radius:10px;font-size:14px;font-weight:700;
@@ -290,9 +292,12 @@
 
 <div class="top-overlay">
   <div class="status-bar">
-    <div class="info">
-      <div class="title" id="statusTitle">東京家族旅行 2026</div>
-      <div class="sub" id="statusSub">爸爸・媽媽・5歲小孩</div>
+    <div class="left-group">
+      <button class="menu-btn" id="viewModeBtn" title="切換地圖/行程列表模式">🗺️</button>
+      <div class="info">
+        <div class="title" id="statusTitle">東京家族旅行 2026</div>
+        <div class="sub" id="statusSub">爸爸・媽媽・5歲小孩</div>
+      </div>
     </div>
     <div class="clock" id="statusClock">--:--</div>
     <button class="menu-btn" id="fabMenuBtn" title="更多功能">☰</button>
@@ -304,7 +309,6 @@
   <button class="menu-item" id="menuShop">🛍️ 購物清單</button>
   <button class="menu-item" id="menuTicket">🎫 憑證口袋</button>
   <button class="menu-item" id="menuLocate">📍 我的位置</button>
-  <button class="menu-item" id="menuViewMode">📋 切換為行程列表模式</button>
   <button class="menu-item" id="menuHideTransit">🚗 隱藏交通方式</button>
 </div>
 
@@ -649,8 +653,8 @@ let lastFocusedKey = null;
 let lastFitDay = null;
 let passedLine = null;
 let staggerPending = true;
-// 地圖模式(預設) / 行程列表模式：純畫面狀態，不記憶，每次重整回地圖模式
-let viewMode = "map";
+// 地圖模式 / 行程列表模式(預設)：純畫面狀態，不記憶，每次重整回列表模式
+let viewMode = "list";
 let lastScrolledFocusIdx = null;
 let hideTransit = false;
 function toggleHideTransit(){
@@ -667,7 +671,9 @@ function applyViewMode(){
   document.getElementById("map").classList.toggle("list-hidden", isList);
   document.getElementById("sheet").classList.toggle("expanded", isList);
   document.getElementById("sheet").classList.toggle("mode-locked", isList);
-  document.getElementById("menuViewMode").textContent = isList ? "🗺️ 切換為地圖模式" : "📋 切換為行程列表模式";
+  const btn = document.getElementById("viewModeBtn");
+  btn.textContent = isList ? "🗺️" : "📋";
+  btn.title = isList ? "切換為地圖模式" : "切換為行程列表模式";
   lastScrolledFocusIdx = null;
   if(isList) scrollToCurrentFocus();
 }
@@ -1562,7 +1568,7 @@ function startApp(){
     if(userLL) map.flyTo(userLL, 16, {duration:.8});
     else showToast("尚未取得定位（請允許定位權限）");
   };
-  document.getElementById("menuViewMode").onclick = ()=>{ closeMenu(); toggleViewMode(); };
+  document.getElementById("viewModeBtn").onclick = toggleViewMode;
   document.getElementById("menuHideTransit").onclick = ()=>{ closeMenu(); toggleHideTransit(); };
   document.getElementById("fabSim").onclick = ()=>advanceSim(30);
 
@@ -1587,6 +1593,7 @@ function startApp(){
   initMap();
   initSheetDrag();
   renderAll();
+  applyViewMode();
   loadWeather();
   setInterval(renderStatus, 1000);
   setInterval(renderAll, 30000);
