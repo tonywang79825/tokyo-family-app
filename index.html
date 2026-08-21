@@ -217,6 +217,7 @@
   .marker-pin{width:132px;height:132px;border-radius:42px;background:var(--paper);border:9px solid var(--accent);display:flex;align-items:center;justify-content:center;
     font-size:60px;box-shadow:0 3px 10px rgba(0,0,0,.3);position:relative;transform-origin:50% 100%;transform:scale(var(--mzoom,1));transition:transform .3s ease;}
   .marker-pin.has-photo{background:none;border:none;box-shadow:none;}
+  .marker-pin.has-photo .pin-emoji,.marker-dot.has-photo .pin-emoji{visibility:hidden;}
   .marker-pin.here{z-index:999 !important;animation:markerGrow .35s ease-out forwards, float 2s ease-in-out .35s infinite;border-color:var(--green);filter:drop-shadow(0 8px 22px rgba(212,72,32,.5));}
   .marker-pin.here.has-photo{filter:drop-shadow(0 10px 26px rgba(0,0,0,.55));}
   /* here 剛出現時先從原本大小平滑放大到目標倍率,結束值需與 float 的 0% 一致才會接得無縫 */
@@ -786,7 +787,7 @@ function transitArt(e, cls){
 
 function makeIcon(emoji, isHere, dropDelay, minor, artHtml, hasArt){
   const cls = (minor ? "marker-dot" : "marker-pin") + (hasArt ? " has-photo" : "");
-  const pin = `<div class="${cls} ${isHere?'here':''}">${emoji}${artHtml||""}</div>`;
+  const pin = `<div class="${cls} ${isHere?'here':''}"><span class="pin-emoji">${emoji}</span>${artHtml||""}</div>`;
   return L.divIcon({
     className:"leaflet-div-icon",
     html: dropDelay!=null ? `<div class="marker-drop" style="animation-delay:${dropDelay}ms">${pin}</div>` : pin,
@@ -1326,7 +1327,7 @@ function bearingDeg(a, b){
   return (toDeg(Math.atan2(y,x))+360)%360;
 }
 // 圖示本身畫的朝向（順時針，0=正上方）：只校準有明顯方向性的插畫，其餘維持不旋轉
-const VEHICLE_ART_BEARING = {plane:225};
+const VEHICLE_ART_BEARING = {plane:225, taxi:225, twtaxi:225, car:225, bus:225, ferry:225, train:225};
 function bearingAlongRoute(pts, frac){
   if(!pts || pts.length<2) return null;
   const segs=[]; let total=0;
