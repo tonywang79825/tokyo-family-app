@@ -111,10 +111,6 @@
 
   .sheet-list{display:none;padding:0 16px 16px;height:calc(100% - 40px);overflow-y:auto;}
   .sheet.expanded .sheet-list{display:block;}
-  .variant-toggle{display:flex;gap:8px;margin:4px 0 12px;}
-  .variant-toggle button{flex:1;padding:8px;border-radius:12px;border:2px solid var(--paper-2);background:var(--paper-2);
-    font-weight:700;font-size:12px;color:var(--ink-soft);cursor:pointer;}
-  .variant-toggle button.active{background:var(--accent);color:#fff;border-color:var(--accent-dark);}
   .note-banner{background:#FBEAD3;border-left:4px solid var(--orange);border-radius:8px;padding:8px 10px;font-size:12px;margin-bottom:10px;}
   .note-banner.hard{background:#FBE0DC;border-left-color:var(--red);color:var(--red);font-weight:700;}
   .event-row{display:flex;align-items:center;gap:10px;padding:9px 4px 9px 8px;border-bottom:1px solid var(--paper-2);border-left:3px solid transparent;cursor:pointer;}
@@ -425,7 +421,6 @@ const DAY0 = {
 const DAY_NOTES = {
   5:"富津生態屋私有道路無路燈，16:30前抵達",
   6:"沖之島潮間帶，出發前確認潮汐",
-  7:"天外天晚餐需預約（9月待開放）",
   8:"曼珠沙華花況出發前確認",
   10:"⚠️ 15:30 出發 / 16:45 還車 / 18:00 check-in"
 };
@@ -598,11 +593,7 @@ async function loadWeather(){
 
 function getAllDays(){ return [DAY0, ...TRIP_DATA.days]; }
 
-function getDayEvents(dayObj){
-  if(!dayObj.events_common) return dayObj.events || [];
-  const variant = MockSync.getSetting("day2_variant","A");
-  return [...dayObj.events_common, ...(variant==="A"? dayObj.events_variantA : dayObj.events_variantB)];
-}
+function getDayEvents(dayObj){ return dayObj.events || []; }
 
 function getCurrentTripDay(){
   const t = todayStr();
@@ -656,9 +647,12 @@ let staggerPending = true;
 // 地圖模式 / 行程列表模式(預設)：純畫面狀態，不記憶，每次重整回列表模式
 let viewMode = "list";
 let lastScrolledFocusIdx = null;
-let hideTransit = false;
+let hideTransit = true;
 function toggleHideTransit(){
   hideTransit = !hideTransit;
+  applyHideTransit();
+}
+function applyHideTransit(){
   document.getElementById("sheetList").classList.toggle("hide-transit", hideTransit);
   document.getElementById("menuHideTransit").textContent = hideTransit ? "🚗 顯示交通方式" : "🚗 隱藏交通方式";
 }
@@ -951,13 +945,6 @@ function renderSheet(){
   // expanded list
   const list = document.getElementById("sheetList");
   let html = "";
-  if(dayObj.events_common){
-    const variant = MockSync.getSetting("day2_variant","A");
-    html += `<div class="variant-toggle">
-      <button class="${variant==='A'?'active':''}" onclick="setVariant('A')">⚾ 棒球版</button>
-      <button class="${variant==='B'?'active':''}" onclick="setVariant('B')">🚡 纜車版</button>
-    </div>`;
-  }
   if(weatherState && weatherState.rain>=50 && WEATHER_BACKUP[dayObj.day] && dayObj.day===getCurrentTripDay()){
     html += `<div class="note-banner">☔ 今日降雨機率 ${weatherState.rain}% — ${WEATHER_BACKUP[dayObj.day]}</div>`;
   }
@@ -996,7 +983,6 @@ function renderSheet(){
   if(viewMode==="list") scrollToCurrentFocus();
 }
 
-function setVariant(v){ staggerPending=true; MockSync.setSetting("day2_variant", v); renderAll(); }
 
 function handleEventTap(idx){
   if(sheetLongPressFired) { sheetLongPressFired=false; return; }
@@ -1594,6 +1580,7 @@ function startApp(){
   initSheetDrag();
   renderAll();
   applyViewMode();
+  applyHideTransit();
   loadWeather();
   setInterval(renderStatus, 1000);
   setInterval(renderAll, 30000);
