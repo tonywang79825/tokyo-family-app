@@ -167,12 +167,10 @@
   .modal-header h3{margin:0;font-size:17px;}
   .modal-header button{background:none;border:none;font-size:20px;color:var(--ink-soft);cursor:pointer;}
   .modal-body{padding:0 16px 16px;}
-  .hero{width:100%;aspect-ratio:1/1;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:48px;margin-bottom:12px;position:relative;overflow:hidden;
-    background:radial-gradient(120% 90% at 50% 38%, rgba(255,255,255,.95) 0%, rgba(255,255,255,0) 62%), linear-gradient(160deg, var(--paper) 0%, var(--paper-2) 100%);}
-  .hero::before{content:"";position:absolute;left:50%;bottom:9%;width:52%;height:11%;transform:translateX(-50%);border-radius:50%;
-    background:radial-gradient(ellipse at center, rgba(46,40,34,.2), rgba(46,40,34,0) 72%);filter:blur(1px);}
-  .hero-emoji{position:relative;z-index:2;}
-  .hero.has-photo .hero-emoji{visibility:hidden;}
+  .hero-frame{position:relative;display:flex;align-items:flex-end;min-height:74px;padding:0 0 12px 132px;margin:34px 0 4px;}
+  .hero-frame h2{margin:0;font-size:22px;font-weight:900;line-height:1.15;text-wrap:balance;}
+  .hero-visual{position:absolute;top:-38px;left:0;width:112px;height:112px;display:flex;align-items:center;justify-content:center;font-size:56px;}
+  .hero-visual.has-photo .hero-emoji{visibility:hidden;}
   .info-row{display:flex;gap:8px;font-size:13px;padding:6px 0;border-bottom:1px solid var(--paper-2);}
   .info-row .k{color:var(--ink-soft);width:70px;flex:none;}
   .event-note-banner{background:#FBEAD3;border-left:4px solid var(--orange);border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:10px;font-weight:700;}
@@ -257,7 +255,7 @@
   #daySplash .t{font-size:30px;color:#fff;font-weight:900;margin-top:8px;text-align:center;padding:0 24px;}
   @keyframes splash{0%{opacity:0;}12%{opacity:1;}75%{opacity:1;}100%{opacity:0;}}
   .mk-img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:1;filter:contrast(1.08) saturate(1.06) drop-shadow(0 3px 6px rgba(46,40,34,.35));}
-  .hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:2;filter:drop-shadow(0 10px 14px rgba(46,40,34,.22));}
+  .hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:2;filter:drop-shadow(0 10px 12px rgba(46,40,34,.28));}
   .thumb-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
   .user-dot{width:16px;height:16px;border-radius:50%;background:#2A7BE4;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4);position:relative;}
   .user-dot::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid #2A7BE4;opacity:.5;animation:ring 2s ease-out infinite;}
@@ -1070,12 +1068,16 @@ function openPlaceModal(placeKey, fallbackTitle, time, eventNote, eventDuration)
   }
   const priceStr = p.price ? Object.entries(p.price).map(([k,v])=>`${k}: ¥${v}`).join(" / ") : "";
   const tagsHtml = (p.tags && p.tags.length) ? `<div class="tag-row">${p.tags.map(t=>`<span class="tag-chip">${t}</span>`).join("")}${p.childFriendly?`<span class="tag-chip child">👨‍👩‍👧 適合親子</span>`:""}</div>` : (p.childFriendly?`<div class="tag-row"><span class="tag-chip child">👨‍👩‍👧 適合親子</span></div>`:"");
+  const hasPhoto = !!(placeKey && !imgFailed.has("p:"+placeKey));
   el.innerHTML = `
-    <div class="modal-header"><h3>${p.name}</h3><button onclick="hideModals()">✕</button></div>
+    <div class="modal-header"><h3></h3><button onclick="hideModals()">✕</button></div>
     <div class="modal-body">
+      <div class="hero-frame">
+        <div class="hero-visual ${hasPhoto?"has-photo":""}"><span class="hero-emoji">${TYPE_ICON[p.type]||"📍"}</span>${placePhoto(placeKey,"hero-img")}</div>
+        <h2>${p.name}</h2>
+      </div>
       ${eventNoteHtml}
       ${eventDuration!=null?`<div class="info-row"><div class="k">預計停留</div><div>約 ${formatDurationMin(eventDuration)}</div></div>`:""}
-      <div class="hero ${(placeKey && !imgFailed.has("p:"+placeKey))?"has-photo":""}"><span class="hero-emoji">${TYPE_ICON[p.type]||"📍"}</span>${placePhoto(placeKey,"hero-img")}</div>
       ${p.nameJa?`<div class="info-row"><div class="k">日文名</div><div>${p.nameJa}</div></div>`:""}
       <div class="info-row"><div class="k">地址</div><div>${p.address||"—"}</div></div>
       <div class="info-row"><div class="k">最近車站</div><div>${p.nearestStation||"—"}</div></div>
