@@ -974,7 +974,10 @@ function renderSheet(){
     const label = eventLabel(e);
     const durHtml = (e.duration!=null && cat!=="transit") ? `<span class="dur-chip">🕐 停留約${durationLabel(e.duration)}</span>` : "";
     // 交通類事件如果沒寫 note，退回用 steps 自動組摘要，不要讓「怎麼去、多久」整個空白。
-    const noteText = e.note || (cat==="transit" ? stepsSummaryText(e.steps) : "");
+    // 有 choices（候選清單、還沒定案）的事件：已選就顯示選了誰，沒選就提示點進去看候選。
+    const noteText = (e.choices && e.choices.length)
+      ? ((e.override && e.override.choice) ? `✅ 已選：${e.override.choice}` : `${e.note?e.note+"；":""}📋 點選查看 ${e.choices.length} 個候選`)
+      : (e.note || (cat==="transit" ? stepsSummaryText(e.steps) : ""));
     const isFocus = current && e._idx===current._idx;
     html += `<div class="event-row type-${cat} ${skipped?'skipped':''} ${staggerPending?'stagger':''} ${isFocus?'current-focus':''}" data-idx="${e._idx}"${staggerPending?` style="animation-delay:${i*35}ms"`:""} onclick="handleEventTap(${e._idx})" ontouchstart="startLongPress(${e._idx})" ontouchend="cancelLongPress()" onmousedown="startLongPress(${e._idx})" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()">
       <div class="time">${e.time}</div>
@@ -999,6 +1002,7 @@ function handleEventTap(idx){
   const events = eventsWithOverrides(dayObj.day, getDayEvents(dayObj));
   const e = events[idx];
   if(e.place) openPlaceModal(e.place, e.title, e.time, e.note, e.duration);
+  else if(e.choices && e.choices.length) openChoiceModal(idx);
   else if(catOf(e.type)==="transit") openRouteModal(idx);
 }
 
@@ -1187,6 +1191,28 @@ function openOverrideModal(idx){
       <button class="opt-btn" onclick="setOverride(${dayObj.day},${idx},null)">取消所有異動</button>
     </div>`;
   showModal("overrideModal");
+}
+// 「候選清單、還沒定案」的事件（如消夜/晚餐候選餐廳）：點下去選一個，選完記住、可再點改選
+function openChoiceModal(idx){
+  const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
+  const events = eventsWithOverrides(dayObj.day, getDayEvents(dayObj));
+  const e = events[idx];
+  const chosen = e.override && e.override.choice;
+  const el = document.getElementById("overrideModal");
+  el.innerHTML = `
+    <div class="modal-header"><h3>${e.title}</h3><button onclick="hideModals()">✕</button></div>
+    <div class="modal-body">
+      ${e.note ? `<div class="event-note-banner">📌 ${e.note}</div>` : ""}
+      ${e.choices.map(c=>`<button class="opt-btn" onclick="chooseOption(${dayObj.day},${idx},'${c.replace(/'/g,"\\'")}')">${c===chosen?"✅ ":""}${c}</button>`).join("")}
+      ${chosen ? `<button class="opt-btn danger" onclick="chooseOption(${dayObj.day},${idx},null)">清除已選</button>` : ""}
+    </div>`;
+  showModal("overrideModal");
+}
+function chooseOption(day, idx, choice){
+  const cur = MockSync.getOverrides()[day+"-"+idx] || {};
+  MockSync.setOverride(day, idx, choice===null ? null : {...cur, choice});
+  hideModals();
+  renderAll();
 }
 function setOverride(day, idx, override){
   MockSync.setOverride(day, idx, override);
