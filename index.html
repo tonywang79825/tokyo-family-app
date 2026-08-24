@@ -160,16 +160,17 @@
   .overlay-backdrop{position:fixed;inset:0;background:rgba(46,40,34,.45);z-index:700;opacity:0;pointer-events:none;transition:opacity .2s;}
   .overlay-backdrop.show{opacity:1;pointer-events:auto;}
   .modal-sheet{position:fixed;left:0;right:0;bottom:0;z-index:800;background:var(--paper);border-radius:22px 22px 0 0;
-    box-shadow:0 -8px 30px rgba(46,40,34,.3);max-height:80%;overflow-y:auto;transform:translateY(100%);transition:transform .38s cubic-bezier(.32,1.3,.5,1);
-    padding-bottom:calc(env(safe-area-inset-bottom,0px) + 16px);}
+    box-shadow:0 -8px 30px rgba(46,40,34,.3);overflow:visible;transform:translateY(100%);transition:transform .38s cubic-bezier(.32,1.3,.5,1);}
   .modal-sheet.show{transform:translateY(0);}
-  .modal-header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 6px;}
+  .modal-header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 6px;position:relative;z-index:2;}
   .modal-header h3{margin:0;font-size:17px;}
   .modal-header button{background:none;border:none;font-size:20px;color:var(--ink-soft);cursor:pointer;}
-  .modal-body{padding:0 16px 16px;}
-  .hero-frame{position:relative;display:flex;align-items:flex-end;min-height:74px;padding:0 0 12px 168px;margin:64px 0 4px;}
+  .modal-body{padding:0 16px 16px;max-height:calc(80vh - 50px);overflow-y:auto;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 16px);}
+  /* hero-visual 是 modal-sheet 的直接子節點（不在 modal-body 裡），這樣負的 top 才能真的
+     蓋出卡片外緣，不會被 modal-body 的 overflow-y:auto 裁掉 */
+  .hero-frame{display:flex;align-items:flex-end;min-height:44px;padding:0 0 12px 168px;margin:0 0 4px;}
   .hero-frame h2{margin:0;font-size:22px;font-weight:900;line-height:1.15;text-wrap:balance;}
-  .hero-visual{position:absolute;top:-64px;left:0;width:150px;height:150px;display:flex;align-items:center;justify-content:center;font-size:56px;}
+  .hero-visual{position:absolute;top:-56px;left:16px;width:150px;height:150px;display:flex;align-items:center;justify-content:center;font-size:56px;z-index:1;}
   .hero-visual.has-photo .hero-emoji{visibility:hidden;}
   .info-row{display:flex;gap:8px;font-size:13px;padding:6px 0;border-bottom:1px solid var(--paper-2);}
   .info-row .k{color:var(--ink-soft);width:70px;flex:none;}
@@ -1089,9 +1090,9 @@ function openPlaceModal(placeKey, fallbackTitle, time, eventNote, eventDuration)
   const hasPhoto = !!(placeKey && !imgFailed.has("p:"+placeKey));
   el.innerHTML = `
     <div class="modal-header"><h3></h3><button onclick="hideModals()">✕</button></div>
+    <div class="hero-visual ${hasPhoto?"has-photo":""}"><span class="hero-emoji">${TYPE_ICON[p.type]||"📍"}</span>${placePhoto(placeKey,"hero-img")}</div>
     <div class="modal-body">
       <div class="hero-frame">
-        <div class="hero-visual ${hasPhoto?"has-photo":""}"><span class="hero-emoji">${TYPE_ICON[p.type]||"📍"}</span>${placePhoto(placeKey,"hero-img")}</div>
         <h2>${p.name}</h2>
       </div>
       ${eventNoteHtml}
