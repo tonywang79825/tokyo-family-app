@@ -576,9 +576,13 @@ function hmToMin(hm){ const [h,m] = hm.split(":").map(Number); return h*60+m; }
 function durationLabel(mins){ return mins>=60 ? `${Math.floor(mins/60)}小時${mins%60?(mins%60)+"分":""}` : `${mins}分`; }
 // 交通/物流事件一律顯示事件自己的標題（例如「ecbo cloak 行李寄放」），不要被連結的
 // place 名稱蓋掉——否則「去HOSTEL LUND寄放行李」會被誤讀成「入住HOSTEL LUND」
+// checkin 顯示地點的正式全名（訂房用的官方名稱，比「XX入住」這種通用動作標題更有用）；
+// 其餘類型一律用事件自己的標題——place.name 只是資料錨點（地址/插畫/座標用），不該蓋掉像
+// 「DeNA 灣星 vs 養樂多燕子」「Bulldog 洋食老店」這種帶有實際資訊的自訂標題。
 function eventLabel(e){
+  if(e.type!=="checkin") return e.title;
   const place = e.place ? TRIP_DATA.places[e.place] : null;
-  return (catOf(e.type)==="transit" || e.type==="logistics") ? e.title : (place?.name || e.title);
+  return place?.name || e.title;
 }
 function eventTz(e){ return (e.coord && e.coord[0] < 30) ? "+08:00" : "+09:00"; }
 function eventEpoch(dayObj, e){ return new Date(dayObj.date+"T"+e.time+":00"+eventTz(e)).getTime(); }
