@@ -167,9 +167,9 @@
   .modal-header h3{margin:0;font-size:17px;}
   .modal-header button{background:none;border:none;font-size:20px;color:var(--ink-soft);cursor:pointer;}
   .modal-body{padding:0 16px 16px;}
-  .hero-frame{position:relative;display:flex;align-items:flex-end;min-height:74px;padding:0 0 12px 132px;margin:34px 0 4px;}
+  .hero-frame{position:relative;display:flex;align-items:flex-end;min-height:74px;padding:0 0 12px 168px;margin:64px 0 4px;}
   .hero-frame h2{margin:0;font-size:22px;font-weight:900;line-height:1.15;text-wrap:balance;}
-  .hero-visual{position:absolute;top:-38px;left:0;width:112px;height:112px;display:flex;align-items:center;justify-content:center;font-size:56px;}
+  .hero-visual{position:absolute;top:-64px;left:0;width:150px;height:150px;display:flex;align-items:center;justify-content:center;font-size:56px;}
   .hero-visual.has-photo .hero-emoji{visibility:hidden;}
   .info-row{display:flex;gap:8px;font-size:13px;padding:6px 0;border-bottom:1px solid var(--paper-2);}
   .info-row .k{color:var(--ink-soft);width:70px;flex:none;}
@@ -188,6 +188,10 @@
     font-size:14px;font-weight:700;margin-bottom:8px;cursor:pointer;}
   .opt-btn.danger{color:var(--red);}
   .opt-btn .opt-hint{display:block;font-size:12px;font-weight:400;color:var(--ink-soft);margin-top:2px;}
+  .opt-row{display:flex;gap:8px;align-items:stretch;margin-bottom:8px;}
+  .opt-row .opt-btn{margin-bottom:0;flex:1;min-width:0;}
+  .opt-nav{flex:none;width:46px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:var(--paper-2);
+    font-size:19px;text-decoration:none;color:var(--ink);}
   .step{display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed var(--paper-2);font-size:13px;align-items:flex-start;}
   .step .ic{font-size:16px;}
   .steps-summary{font-size:12px;font-weight:800;color:var(--accent-dark);background:var(--paper-2);border-radius:10px;padding:7px 10px;margin:8px 0 2px;}
@@ -901,7 +905,7 @@ function renderSheet(){
     const icon = cat==="transit" ? (MODE_EMOJI[e.mode] || TYPE_ICON[e.type] || "📍") : (TYPE_ICON[e.type]||"📍");
     return `<div class="event-row type-${cat}" onclick="handleEventTap(${e._idx})">
       <div class="time">${e.time}</div>
-      <div class="thumb-sm">${icon}${cat==="transit" ? transitArt(e,"thumb-sm-img") : placePhoto(e.place,"thumb-sm-img")}</div>
+      <div class="thumb-sm">${icon}${cat==="transit" ? transitArt(e,"thumb-sm-img") : placePhoto(e.place||e.icon,"thumb-sm-img")}</div>
       <div class="et"><div class="t">${eventLabel(e)}</div></div>
       <button class="skip-btn" onclick="event.stopPropagation();openOverrideModal(${e._idx})" title="調整此行程">✕</button>
     </div>`;
@@ -924,7 +928,7 @@ function renderSheet(){
     const vChipHtml = (voucher && voucher.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${voucher.code}')">🎫 ${voucher.code}<span>複製</span></div>` : "";
     const hintHtml = hintEvent ? `
       <div class="next-hint" onclick="openRouteModal(${hintEvent._idx})">
-        <div class="thumb-sm">${MODE_EMOJI[hintEvent.mode]||TYPE_ICON[hintEvent.type]||"📍"}${catOf(hintEvent.type)==="transit" ? transitArt(hintEvent,"thumb-sm-img") : placePhoto(hintEvent.place,"thumb-sm-img")}</div>
+        <div class="thumb-sm">${MODE_EMOJI[hintEvent.mode]||TYPE_ICON[hintEvent.type]||"📍"}${catOf(hintEvent.type)==="transit" ? transitArt(hintEvent,"thumb-sm-img") : placePhoto(hintEvent.place||hintEvent.icon,"thumb-sm-img")}</div>
         <div class="et">
           <div class="t">下一站・${hintEvent.time} ${eventLabel(hintEvent)}</div>
           ${hintCdText ? `<div class="n">${hintCdText}</div>` : ""}
@@ -933,7 +937,7 @@ function renderSheet(){
       </div>` : "";
     collapsed.innerHTML = `
       <div class="cur-row">
-        <div class="thumb type-${catOf(mainEvent.type)}">${TYPE_ICON[mainEvent.type]||"📍"}${catOf(mainEvent.type)==="transit" ? transitArt(mainEvent,"thumb-img") : placePhoto(mainEvent.place,"thumb-img")}</div>
+        <div class="thumb type-${catOf(mainEvent.type)}">${TYPE_ICON[mainEvent.type]||"📍"}${catOf(mainEvent.type)==="transit" ? transitArt(mainEvent,"thumb-img") : placePhoto(mainEvent.place||mainEvent.icon,"thumb-img")}</div>
         <div class="cur-info">
           <div class="name">${eventLabel(mainEvent)}</div>
           <div class="meta">${mainEvent.time} ${modeChip} ${statusBadge(mainEvent)}</div>
@@ -982,7 +986,7 @@ function renderSheet(){
     const isFocus = current && e._idx===current._idx;
     html += `<div class="event-row type-${cat} ${skipped?'skipped':''} ${staggerPending?'stagger':''} ${isFocus?'current-focus':''}" data-idx="${e._idx}"${staggerPending?` style="animation-delay:${i*35}ms"`:""} onclick="handleEventTap(${e._idx})" ontouchstart="startLongPress(${e._idx})" ontouchend="cancelLongPress()" onmousedown="startLongPress(${e._idx})" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()">
       <div class="time">${e.time}</div>
-      <div class="thumb-sm">${icon}${cat==="transit" ? transitArt(e,"thumb-sm-img") : placePhoto(e.place,"thumb-sm-img")}</div>
+      <div class="thumb-sm">${icon}${cat==="transit" ? transitArt(e,"thumb-sm-img") : placePhoto(e.place||e.icon,"thumb-sm-img")}</div>
       <div class="et">
         <div class="t">${label}</div>
         ${(statusBadge(e) || durHtml) ? `<div class="meta">${statusBadge(e)}${durHtml}</div>` : ""}
@@ -1204,7 +1208,10 @@ function openChoiceModal(idx){
     <div class="modal-header"><h3>${e.title}</h3><button onclick="hideModals()">✕</button></div>
     <div class="modal-body">
       ${e.note ? `<div class="event-note-banner">📌 ${e.note}</div>` : ""}
-      ${e.choices.map(c=>`<button class="opt-btn" onclick="chooseOption(${dayObj.day},${idx},'${c.name.replace(/'/g,"\\'")}')">${c.name===chosen?"✅ ":""}${c.name}${c.hint?`<span class="opt-hint">${c.hint}</span>`:""}</button>`).join("")}
+      ${e.choices.map(c=>`<div class="opt-row">
+        <button class="opt-btn" onclick="chooseOption(${dayObj.day},${idx},'${c.name.replace(/'/g,"\\'")}')">${c.name===chosen?"✅ ":""}${c.name}${c.hint?`<span class="opt-hint">${c.hint}</span>`:""}</button>
+        <a class="opt-nav" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.name)}" target="_blank" rel="noopener" title="在 Google Maps 導航">🧭</a>
+      </div>`).join("")}
       ${chosen ? `<button class="opt-btn danger" onclick="chooseOption(${dayObj.day},${idx},null)">清除已選</button>` : ""}
     </div>`;
   showModal("overrideModal");
