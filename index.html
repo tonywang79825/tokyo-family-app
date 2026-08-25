@@ -149,8 +149,12 @@
     background:#FDF3E7;border:1.5px dashed var(--accent);font-family:ui-monospace,monospace;font-size:12px;font-weight:800;
     color:var(--accent-dark);cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .v-chip span{background:var(--accent);color:#fff;border-radius:7px;padding:2px 7px;font-size:10px;font-family:'Noto Sans TC',sans-serif;flex:none;}
-  .voucher-files{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
-  .file-btn{background:var(--paper-2);border:none;border-radius:10px;padding:6px 10px;font-size:12px;font-weight:700;color:var(--ink);cursor:pointer;}
+  .voucher-files{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+  .file-btn{display:inline-flex;align-items:center;gap:6px;background:var(--paper);border:1.5px solid var(--paper-2);
+    border-radius:10px;padding:7px 12px;font-size:12px;font-weight:700;color:var(--ink-soft);cursor:pointer;
+    text-decoration:none;box-shadow:0 1px 3px rgba(46,40,34,.08);transition:background .15s,border-color .15s,color .15s;}
+  .file-btn:hover{border-color:var(--accent);color:var(--accent-dark);background:#FDF3E7;}
+  .file-btn:active{transform:scale(.97);}
   .next-hint{display:flex;align-items:center;gap:8px;margin-top:10px;padding:7px 8px;border-radius:12px;background:var(--paper-2);cursor:pointer;}
   .next-hint .thumb-sm{width:32px;height:32px;border-radius:9px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex:none;position:relative;overflow:hidden;}
   .next-hint .et{flex:1;min-width:0;}
@@ -278,12 +282,9 @@
   #alarmOverlay .note{font-size:18px;font-weight:800;}
   #alarmOverlay .cd{font-size:58px;font-weight:900;font-variant-numeric:tabular-nums;margin:12px 0;}
   #alarmOverlay button{margin-top:22px;background:#fff;color:#B22814;border:none;border-radius:16px;padding:12px 28px;font-weight:900;font-size:15px;}
-  .voucher{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--paper-2);}
-  .voucher .v-info{flex:1;min-width:0;}
-  .voucher .v-name{font-size:13px;font-weight:800;}
-  .voucher .v-meta{font-size:11px;color:var(--ink-soft);margin-top:1px;}
-  .voucher .v-code{font-size:14px;font-weight:900;color:var(--accent);margin-top:3px;word-break:break-all;font-family:ui-monospace,monospace;}
-  .voucher .v-copy{flex:none;background:var(--paper-2);border:none;border-radius:12px;padding:8px 14px;font-weight:800;font-size:12px;color:var(--ink);cursor:pointer;}
+  .voucher{padding:14px;margin:0 0 10px;border-radius:14px;background:var(--paper);box-shadow:0 1px 4px rgba(46,40,34,.07);border:1px solid var(--paper-2);}
+  .voucher .v-name{font-size:14px;font-weight:800;}
+  .voucher .v-meta{font-size:11px;color:var(--ink-soft);margin-top:2px;}
   .leaflet-popup-content{margin:10px 12px;font-family:'Noto Sans TC',sans-serif;}
   .popup-name{font-weight:900;font-size:13px;}
   .popup-time{font-size:11px;color:var(--ink-soft);margin:2px 0 6px;}
@@ -933,7 +934,7 @@ function renderSheet(){
   if(mainEvent){
     const modeChip = !isCurrentMain ? `<span class="badge pending">${MODE_EMOJI[mainEvent.mode]||"🧭"} 下一站</span>` : `<span class="badge confirmed">現在</span>`;
     const voucher = findVoucher(dayObj.day, mainEvent);
-    const vChipHtml = (voucher && voucher.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${voucher.code}')">🎫 ${voucher.code}<span>複製</span></div>` : "";
+    const vChipHtml = (voucher && voucher.code && voucher.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${voucher.code}')">🎫 ${voucher.code}<span>複製</span></div>` : "";
     const hintHtml = hintEvent ? `
       <div class="next-hint" onclick="openRouteModal(${hintEvent._idx})">
         <div class="thumb-sm">${MODE_EMOJI[hintEvent.mode]||TYPE_ICON[hintEvent.type]||"📍"}${catOf(hintEvent.type)==="transit" ? transitArt(hintEvent,"thumb-sm-img") : placePhoto(hintEvent.place||hintEvent.icon,"thumb-sm-img")}</div>
@@ -1548,13 +1549,10 @@ function openVoucherModal(){
   el.innerHTML = `<div class="modal-header"><h3>🎫 憑證口袋</h3><button onclick="hideModals()">✕</button></div>
     <div class="modal-body">${VOUCHERS.map(v=>`
       <div class="voucher">
-        <div class="v-info">
-          <div class="v-name">${v.name}</div>
-          <div class="v-meta">${v.date}${v.note?` ・ ${v.note}`:""}</div>
-          ${v.code?`<div class="v-code">${v.code}</div>`:""}
-          ${voucherFilesHtml(v)}
-        </div>
-        ${(v.code && v.code!=="待確認")?`<button class="v-copy" onclick="copyVoucher('${v.code}')">複製</button>`:""}
+        <div class="v-name">${v.name}</div>
+        <div class="v-meta">${v.date}${v.note?` ・ ${v.note}`:""}</div>
+        ${(v.code && v.code!=="待確認")?`<div class="v-chip" onclick="copyVoucher('${v.code}')">🎫 ${v.code}<span>複製</span></div>`:""}
+        ${voucherFilesHtml(v)}
       </div>`).join("")}</div>`;
   showModal("voucherModal");
 }
