@@ -149,12 +149,20 @@
     background:#FDF3E7;border:1.5px dashed var(--accent);font-family:ui-monospace,monospace;font-size:12px;font-weight:800;
     color:var(--accent-dark);cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .v-chip span{background:var(--accent);color:#fff;border-radius:7px;padding:2px 7px;font-size:10px;font-family:'Noto Sans TC',sans-serif;flex:none;}
-  .voucher-files{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
-  .file-btn{display:inline-flex;align-items:center;gap:6px;background:var(--paper);border:1.5px solid var(--paper-2);
-    border-radius:10px;padding:7px 12px;font-size:12px;font-weight:700;color:var(--ink-soft);cursor:pointer;
-    text-decoration:none;box-shadow:0 1px 3px rgba(46,40,34,.08);transition:background .15s,border-color .15s,color .15s;}
-  .file-btn:hover{border-color:var(--accent);color:var(--accent-dark);background:#FDF3E7;}
-  .file-btn:active{transform:scale(.97);}
+  .voucher-ticket{background:#FDF3E7;border:1.5px dashed var(--accent);border-radius:12px;padding:10px 12px;margin:8px 0;}
+  .voucher-ticket .vt-code{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;}
+  .voucher-ticket .vt-code-text{font-family:ui-monospace,monospace;font-weight:900;font-size:14px;color:var(--accent-dark);
+    letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .voucher-ticket .vt-copy{flex:none;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:5px 11px;
+    font-size:11px;font-weight:800;cursor:pointer;}
+  .voucher-ticket .vt-copy:active{background:var(--accent-dark);}
+  .voucher-ticket .vt-files{display:flex;flex-wrap:wrap;gap:6px;}
+  .voucher-ticket .vt-files:not(.no-code){margin-top:9px;padding-top:9px;border-top:1.5px dashed rgba(178,58,24,.3);}
+  .vt-file{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid rgba(178,58,24,.25);
+    border-radius:8px;padding:5px 10px;font-size:11.5px;font-weight:700;color:var(--accent-dark);text-decoration:none;
+    cursor:pointer;transition:background .15s;}
+  .vt-file:hover{background:#FDF3E7;}
+  .vt-file:active{transform:scale(.97);}
   .next-hint{display:flex;align-items:center;gap:8px;margin-top:10px;padding:7px 8px;border-radius:12px;background:var(--paper-2);cursor:pointer;}
   .next-hint .thumb-sm{width:32px;height:32px;border-radius:9px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex:none;position:relative;overflow:hidden;}
   .next-hint .et{flex:1;min-width:0;}
@@ -1092,8 +1100,7 @@ function openPlaceModal(placeKey, fallbackTitle, time, eventNote, eventDuration)
   const tagsHtml = (p.tags && p.tags.length) ? `<div class="tag-row">${p.tags.map(t=>`<span class="tag-chip">${t}</span>`).join("")}${p.childFriendly?`<span class="tag-chip child">👨‍👩‍👧 適合親子</span>`:""}</div>` : (p.childFriendly?`<div class="tag-row"><span class="tag-chip child">👨‍👩‍👧 適合親子</span></div>`:"");
   const hasPhoto = !!(placeKey && !imgFailed.has("p:"+placeKey));
   const voucher = findVoucher(selectedDayNum, {place: placeKey, time});
-  const voucherCodeHtml = (voucher && voucher.code && voucher.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${voucher.code}')">🎫 ${voucher.code}<span>複製</span></div>` : "";
-  const voucherHtml = voucherCodeHtml + voucherFilesHtml(voucher);
+  const voucherHtml = voucherTicketHtml(voucher);
   el.innerHTML = `
     <div class="modal-header"><h3></h3><button onclick="hideModals()">✕</button></div>
     <div class="hero-visual ${hasPhoto?"has-photo":""}"><span class="hero-emoji">${TYPE_ICON[p.type]||"📍"}</span>${placePhoto(placeKey,"hero-img")}</div>
@@ -1185,7 +1192,7 @@ function openRouteModal(idx){
   }
   const weatherHtml = WEATHER_BACKUP[dayObj.day] ? `<div class="note-banner">⛅ ${WEATHER_BACKUP[dayObj.day]}</div>` : "";
   const rv = findVoucher(dayObj.day, e);
-  const voucherHtml = (rv && rv.code && rv.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${rv.code}')" style="margin-bottom:8px;">🎫 ${rv.code}<span>複製</span></div>${voucherFilesHtml(rv)}` : voucherFilesHtml(rv);
+  const voucherHtml = voucherTicketHtml(rv);
   const ll = eventCoord(e);
   el.innerHTML = `
     <div class="modal-header"><h3>怎麼到下一站</h3><button onclick="hideModals()">✕</button></div>
@@ -1551,23 +1558,27 @@ function openVoucherModal(){
       <div class="voucher">
         <div class="v-name">${v.name}</div>
         <div class="v-meta">${v.date}${v.note?` ・ ${v.note}`:""}</div>
-        ${(v.code && v.code!=="待確認")?`<div class="v-chip" onclick="copyVoucher('${v.code}')">🎫 ${v.code}<span>複製</span></div>`:""}
-        ${voucherFilesHtml(v)}
+        ${voucherTicketHtml(v)}
       </div>`).join("")}</div>`;
   showModal("voucherModal");
 }
 function copyVoucher(c){ navigator.clipboard?.writeText(c); showToast("✅ 已複製 "+c); }
 // 憑證的原始檔案（PDF/截圖）放在 Supabase Storage 的 vouchers bucket（家人登入才讀得到），
 // 這裡點擊才現拉一個有時效的連結去開，不會把檔案網址寫死在頁面上。
-function voucherFilesHtml(v){
+// 把訂位代碼與票券/文件連結畫成同一張票根卡片，而不是各自獨立的兩種樣式
+function voucherTicketHtml(v){
   if(!v) return "";
+  const hasCode = v.code && v.code!=="待確認";
   // files 陣列裡每一項可以是 Storage 檔案（path，點擊現拉簽章連結）或外部票券連結（url，直接開新分頁）
   const fileBtns = (v.files && v.files.length) ? v.files.map(f=>
-    f.url ? `<a class="file-btn" href="${f.url}" target="_blank" rel="noopener">🔗 ${f.label}</a>`
-          : `<button class="file-btn" onclick="openVoucherFile('${f.path}')">📄 ${f.label}</button>`
+    f.url ? `<a class="vt-file" href="${f.url}" target="_blank" rel="noopener">🔗 ${f.label}</a>`
+          : `<button class="vt-file" onclick="openVoucherFile('${f.path}')">📄 ${f.label}</button>`
   ).join("") : "";
-  const urlBtn = v.url ? `<a class="file-btn" href="${v.url}" target="_blank" rel="noopener">🔗 開啟票券頁面</a>` : "";
-  return (fileBtns || urlBtn) ? `<div class="voucher-files">${urlBtn}${fileBtns}</div>` : "";
+  const urlBtn = v.url ? `<a class="vt-file" href="${v.url}" target="_blank" rel="noopener">🔗 開啟票券頁面</a>` : "";
+  const filesInner = fileBtns || urlBtn;
+  const codeHtml = hasCode ? `<div class="vt-code"><span class="vt-code-text">🎫 ${v.code}</span><button class="vt-copy" onclick="copyVoucher('${v.code}')">複製</button></div>` : "";
+  const filesHtml = filesInner ? `<div class="vt-files${hasCode?"":" no-code"}">${urlBtn}${fileBtns}</div>` : "";
+  return (codeHtml || filesHtml) ? `<div class="voucher-ticket">${codeHtml}${filesHtml}</div>` : "";
 }
 async function openVoucherFile(path){
   showToast("開啟中…");
