@@ -1561,8 +1561,10 @@ function copyVoucher(c){ navigator.clipboard?.writeText(c); showToast("✅ 已�
 // 憑證的原始檔案（PDF/截圖）放在 Supabase Storage 的 vouchers bucket（家人登入才讀得到），
 // 這裡點擊才現拉一個有時效的連結去開，不會把檔案網址寫死在頁面上。
 function voucherFilesHtml(v){
-  if(!v || !v.files || !v.files.length) return "";
-  return `<div class="voucher-files">${v.files.map(f=>`<button class="file-btn" onclick="openVoucherFile('${f.path}')">📄 ${f.label}</button>`).join("")}</div>`;
+  if(!v) return "";
+  const fileBtns = (v.files && v.files.length) ? v.files.map(f=>`<button class="file-btn" onclick="openVoucherFile('${f.path}')">📄 ${f.label}</button>`).join("") : "";
+  const urlBtn = v.url ? `<a class="file-btn" href="${v.url}" target="_blank" rel="noopener">🔗 開啟票券頁面</a>` : "";
+  return (fileBtns || urlBtn) ? `<div class="voucher-files">${urlBtn}${fileBtns}</div>` : "";
 }
 async function openVoucherFile(path){
   showToast("開啟中…");
