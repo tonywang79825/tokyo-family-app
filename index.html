@@ -73,7 +73,7 @@
 
   /* ---------- Bottom sheet ---------- */
   .sheet{position:fixed;left:0;right:0;bottom:0;z-index:600;background:var(--paper);
-    border-radius:22px 22px 0 0;box-shadow:0 -8px 30px rgba(46,40,34,.25);
+    border-radius:22px 22px 0 0;box-shadow:0 -8px 30px rgba(46,40,34,.25);overflow-x:hidden;
     transform:translateY(0);transition:height .38s cubic-bezier(.34,1.56,.64,1);touch-action:none;
     height:190px;padding-bottom:env(safe-area-inset-bottom,0px);}
   .sheet.expanded{height:calc(100% - 130px);}
@@ -1065,33 +1065,54 @@ function initSheetDrag(){
   // 左右滑動換天：跟垂直捲動/長按用同一個手勢起點判斷方向，
   // 移動 8px 內先不鎖方向（避免手抖把單純點擊誤判成滑動），鎖定橫向後才 preventDefault
   // 蓋掉捲動跟接下來合成的 click，不然滑過的 event-row 會被誤點開。
-  let sx=0, sy=0, swiping=false, lockDir=null;
+  // 鎖定橫向後內容跟著手指位移（有阻尼、超過閾值淡出），放開手：
+  // 過閾值→往反方向滑出、換天、從另一側滑入；沒過閾值→彈回原位。
+  const dragEls = [document.getElementById("sheetList"), document.getElementById("sheetCollapsed")];
+  let sx=0, sy=0, swiping=false, lockDir=null, dragDX=0;
+  const setDrag = (x, opacity, withTransition)=>{
+    dragEls.forEach(el=>{
+      el.style.transition = withTransition ? "transform 200ms ease, opacity 200ms ease" : "none";
+      el.style.transform = `translateX(${x}px)`;
+      el.style.opacity = String(opacity);
+    });
+  };
   sheet.addEventListener("touchstart", e=>{
     if(e.touches.length!==1) return;
     sx = e.touches[0].clientX; sy = e.touches[0].clientY;
-    swiping = true; lockDir = null;
+    swiping = true; lockDir = null; dragDX = 0;
   }, {passive:true});
   sheet.addEventListener("touchmove", e=>{
     if(!swiping) return;
     const dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
     if(lockDir===null && (Math.abs(dx)>8 || Math.abs(dy)>8)) lockDir = Math.abs(dx)>Math.abs(dy) ? "h" : "v";
-    if(lockDir==="h") e.preventDefault();
+    if(lockDir==="h"){
+      e.preventDefault();
+      dragDX = dx;
+      const damped = Math.abs(dx)>120 ? Math.sign(dx)*(120 + (Math.abs(dx)-120)*0.35) : dx;
+      setDrag(damped, Math.max(0.5, 1 - Math.abs(damped)/300), false);
+    }
   }, {passive:false});
   sheet.addEventListener("touchend", e=>{
     if(!swiping) return; swiping = false;
-    if(lockDir!=="h") return;
-    const dx = e.changedTouches[0].clientX - sx;
-    if(Math.abs(dx) < 60) return;
+    if(lockDir!=="h"){ return; }
     e.preventDefault();
     const days = getAllDays();
     const idx = days.findIndex(d=>d.day===selectedDayNum);
-    const nextIdx = idx + (dx < 0 ? 1 : -1);
-    if(idx<0 || nextIdx<0 || nextIdx>=days.length) return;
-    selectedDayNum = days[nextIdx].day;
-    autoFollowToday = false;
-    staggerPending = true;
-    renderAll();
-    document.querySelector(".day-chips .chip.active")?.scrollIntoView({behavior:"smooth", inline:"center", block:"nearest"});
+    const dir = dragDX < 0 ? 1 : -1; // 往左滑（dx<0）→下一天，往右滑→上一天
+    const nextIdx = idx + dir;
+    const canMove = Math.abs(dragDX) >= 60 && idx>=0 && nextIdx>=0 && nextIdx<days.length;
+    if(!canMove){ setDrag(0, 1, true); return; }
+    const vw = window.innerWidth;
+    setDrag(dir * -vw * 0.4, 0, true);
+    setTimeout(()=>{
+      selectedDayNum = days[nextIdx].day;
+      autoFollowToday = false;
+      staggerPending = true;
+      renderAll();
+      document.querySelector(".day-chips .chip.active")?.scrollIntoView({behavior:"smooth", inline:"center", block:"nearest"});
+      setDrag(dir * vw * 0.4, 0, false);
+      requestAnimationFrame(()=>requestAnimationFrame(()=>setDrag(0, 1, true)));
+    }, 200);
   }, {passive:false});
 }
 
