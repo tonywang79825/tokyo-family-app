@@ -149,6 +149,8 @@
     background:#FDF3E7;border:1.5px dashed var(--accent);font-family:ui-monospace,monospace;font-size:12px;font-weight:800;
     color:var(--accent-dark);cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .v-chip span{background:var(--accent);color:#fff;border-radius:7px;padding:2px 7px;font-size:10px;font-family:'Noto Sans TC',sans-serif;flex:none;}
+  .voucher-files{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+  .file-btn{background:var(--paper-2);border:none;border-radius:10px;padding:6px 10px;font-size:12px;font-weight:700;color:var(--ink);cursor:pointer;}
   .next-hint{display:flex;align-items:center;gap:8px;margin-top:10px;padding:7px 8px;border-radius:12px;background:var(--paper-2);cursor:pointer;}
   .next-hint .thumb-sm{width:32px;height:32px;border-radius:9px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex:none;position:relative;overflow:hidden;}
   .next-hint .et{flex:1;min-width:0;}
@@ -1089,7 +1091,7 @@ function openPlaceModal(placeKey, fallbackTitle, time, eventNote, eventDuration)
   const tagsHtml = (p.tags && p.tags.length) ? `<div class="tag-row">${p.tags.map(t=>`<span class="tag-chip">${t}</span>`).join("")}${p.childFriendly?`<span class="tag-chip child">👨‍👩‍👧 適合親子</span>`:""}</div>` : (p.childFriendly?`<div class="tag-row"><span class="tag-chip child">👨‍👩‍👧 適合親子</span></div>`:"");
   const hasPhoto = !!(placeKey && !imgFailed.has("p:"+placeKey));
   const voucher = findVoucher(selectedDayNum, {place: placeKey, time});
-  const voucherHtml = (voucher && voucher.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${voucher.code}')">🎫 ${voucher.code}<span>複製</span></div>` : "";
+  const voucherHtml = (voucher && voucher.code!=="待確認") ? `<div class="v-chip" onclick="copyVoucher('${voucher.code}')">🎫 ${voucher.code}<span>複製</span></div>${voucherFilesHtml(voucher)}` : "";
   el.innerHTML = `
     <div class="modal-header"><h3></h3><button onclick="hideModals()">✕</button></div>
     <div class="hero-visual ${hasPhoto?"has-photo":""}"><span class="hero-emoji">${TYPE_ICON[p.type]||"📍"}</span>${placePhoto(placeKey,"hero-img")}</div>
@@ -1549,12 +1551,25 @@ function openVoucherModal(){
           <div class="v-name">${v.name}</div>
           <div class="v-meta">${v.date}${v.note?` ・ ${v.note}`:""}</div>
           <div class="v-code">${v.code}</div>
+          ${voucherFilesHtml(v)}
         </div>
         ${v.code!=="待確認"?`<button class="v-copy" onclick="copyVoucher('${v.code}')">複製</button>`:""}
       </div>`).join("")}</div>`;
   showModal("voucherModal");
 }
 function copyVoucher(c){ navigator.clipboard?.writeText(c); showToast("✅ 已複製 "+c); }
+// 憑證的原始檔案（PDF/截圖）放在 Supabase Storage 的 vouchers bucket（家人登入才讀得到），
+// 這裡點擊才現拉一個有時效的連結去開，不會把檔案網址寫死在頁面上。
+function voucherFilesHtml(v){
+  if(!v || !v.files || !v.files.length) return "";
+  return `<div class="voucher-files">${v.files.map(f=>`<button class="file-btn" onclick="openVoucherFile('${f.path}')">📄 ${f.label}</button>`).join("")}</div>`;
+}
+async function openVoucherFile(path){
+  showToast("開啟中…");
+  const { data, error } = await sb.storage.from("vouchers").createSignedUrl(path, 3600);
+  if(error || !data){ showToast("❌ 無法開啟文件"); return; }
+  window.open(data.signedUrl, "_blank");
+}
 
 /* ---- GPS 藍點 ---- */
 let userMarker=null, userCircle=null, userLL=null;
