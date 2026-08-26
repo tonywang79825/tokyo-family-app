@@ -836,6 +836,19 @@ function renderMap(dayObj, currentEvent){
   const hereTarget = currentEvent;
   const pts = [];
   let hereIdx = -1;
+  // 同一個地點如果連續兩個事件都連到它（例如「抵達機場」跟稍後「機場出發」），
+  // 座標完全一樣，逐一畫 marker 會疊出一大一小兩個圖示——同地點只留一個代表 marker，
+  // 優先選「現在」那個事件，不然就選第一個。
+  const coordKeyOf = ll => ll[0].toFixed(5)+","+ll[1].toFixed(5);
+  const chosenForCoord = new Map();
+  events.forEach(e=>{
+    if(!e.place) return;
+    const ll = eventCoord(e);
+    if(!ll) return;
+    const key = coordKeyOf(ll);
+    const isHere = hereTarget && hereTarget._idx===e._idx;
+    if(!chosenForCoord.has(key) || isHere) chosenForCoord.set(key, e._idx);
+  });
   events.forEach((e)=>{
     const ll = eventCoord(e);
     if(!ll) return;
@@ -843,6 +856,7 @@ function renderMap(dayObj, currentEvent){
     if(isHere) hereIdx = pts.length;
     const seq = pts.length + 1;
     pts.push(ll);
+    if(e.place && chosenForCoord.get(coordKeyOf(ll)) !== e._idx) return;
     const minor = !e.place;
     const isTransitEvt = catOf(e.type)==="transit";
     const markerEmoji = isTransitEvt ? (MODE_EMOJI[e.mode] || TYPE_ICON[e.type] || "📍") : (TYPE_ICON[e.type]||"📍");
