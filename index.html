@@ -251,6 +251,11 @@
   /* here 剛出現時先從原本大小平滑放大到目標倍率,結束值需與 float 的 0% 一致才會接得無縫 */
   @keyframes markerGrow{0%{transform:translateY(0) scale(var(--mzoom,1));}100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}}
   @keyframes float{0%,100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}50%{transform:translateY(-8px) scale(calc(var(--mzoom,1) * 2.36));}}
+  /* 跟下一/上一個景點靠很近（短程步行）時，2.3倍放大會直接蓋住兩點之間的路——
+     縮小放大倍率，讓路線看得見，仍保留浮動效果標示「現在在這」 */
+  .marker-pin.here.crowded{animation-name:markerGrowSm, floatSm;}
+  @keyframes markerGrowSm{0%{transform:translateY(0) scale(var(--mzoom,1));}100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 1.3));}}
+  @keyframes floatSm{0%,100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 1.3));}50%{transform:translateY(-4px) scale(calc(var(--mzoom,1) * 1.34));}}
   .marker-drop{animation:drop .5s ease-out backwards;}
   @keyframes drop{0%{transform:translateY(-16px) scale(.7);opacity:0;}60%{transform:translateY(3px) scale(1.03);opacity:1;}100%{transform:translateY(0) scale(1);}}
   .route-line{animation:ant-march 1.4s linear infinite;}
@@ -260,6 +265,9 @@
   .marker-dot.here{z-index:999 !important;border-color:var(--green);animation:markerDotGrow .35s ease-out forwards, floatDot 2s ease-in-out .35s infinite;filter:drop-shadow(0 6px 18px rgba(46,125,50,.5));}
   @keyframes markerDotGrow{0%{transform:translateY(0) scale(var(--mzoom,1));}100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}}
   @keyframes floatDot{0%,100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 2.3));}50%{transform:translateY(-6px) scale(calc(var(--mzoom,1) * 2.36));}}
+  .marker-dot.here.crowded{animation-name:markerDotGrowSm, floatDotSm;}
+  @keyframes markerDotGrowSm{0%{transform:translateY(0) scale(var(--mzoom,1));}100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 1.3));}}
+  @keyframes floatDotSm{0%,100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 1.3));}50%{transform:translateY(-3px) scale(calc(var(--mzoom,1) * 1.34));}}
   .vehicle{font-size:32px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center;}
   .vehicle .v-art{position:absolute;inset:0;}
   .veh-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
@@ -815,9 +823,9 @@ function transitArt(e, cls){
   return modeArt(e.mode, cls) + (e.lineKey ? lineArt(e.lineKey, cls) : "");
 }
 
-function makeIcon(emoji, isHere, dropDelay, minor, artHtml, hasArt){
+function makeIcon(emoji, isHere, dropDelay, minor, artHtml, hasArt, crowded){
   const cls = (minor ? "marker-dot" : "marker-pin") + (hasArt ? " has-photo" : "");
-  const pin = `<div class="${cls} ${isHere?'here':''}"><span class="pin-emoji">${emoji}</span>${artHtml||""}</div>`;
+  const pin = `<div class="${cls} ${isHere?'here':''} ${(isHere&&crowded)?'crowded':''}"><span class="pin-emoji">${emoji}</span>${artHtml||""}</div>`;
   return L.divIcon({
     className:"leaflet-div-icon",
     html: dropDelay!=null ? `<div class="marker-drop" style="animation-delay:${dropDelay}ms">${pin}</div>` : pin,
@@ -836,19 +844,41 @@ function renderMap(dayObj, currentEvent){
   const hereTarget = currentEvent;
   const pts = [];
   let hereIdx = -1;
-  // 同一個地點如果連續兩個事件都連到它（例如「抵達機場」跟稍後「機場出發」），
-  // 座標完全一樣，逐一畫 marker 會疊出一大一小兩個圖示——同地點只留一個代表 marker，
-  // 優先選「現在」那個事件，不然就選第一個。
+  // 同一個座標如果被兩個事件同時連到（例如「抵達機場」跟稍後「機場出發」，或是
+  // 有 place 的大圖插畫地點旁邊又有個只帶 coord 的交通事件），逐一畫 marker 會在
+  // 同一個點疊出一大一小兩個圖示——同座標只留一個代表 marker：優先選「現在」那個
+  // 事件，其次優先選有 place（有詳細插畫/資訊）的那個，不然就選第一個。
   const coordKeyOf = ll => ll[0].toFixed(5)+","+ll[1].toFixed(5);
   const chosenForCoord = new Map();
   events.forEach(e=>{
-    if(!e.place) return;
     const ll = eventCoord(e);
     if(!ll) return;
     const key = coordKeyOf(ll);
     const isHere = hereTarget && hereTarget._idx===e._idx;
-    if(!chosenForCoord.has(key) || isHere) chosenForCoord.set(key, e._idx);
+    const score = (isHere?2:0) + (e.place?1:0);
+    const existing = chosenForCoord.get(key);
+    if(!existing || score > existing.score) chosenForCoord.set(key, {idx:e._idx, score});
   });
+  // 先掃一輪算出「現在」這個點跟前後鄰居的實際距離——景點靠很近（短程步行）時，
+  // 「現在」那個放大2.3倍又浮動的插畫會直接把兩點之間的路蓋住，根本看不出怎麼走。
+  const CROWD_KM = 0.3;
+  let hereCrowded = false;
+  {
+    const scanPts = [];
+    let scanHereIdx = -1;
+    events.forEach(e=>{
+      const ll = eventCoord(e);
+      if(!ll) return;
+      if(hereTarget && hereTarget._idx===e._idx) scanHereIdx = scanPts.length;
+      scanPts.push(ll);
+    });
+    if(scanHereIdx>=0){
+      const me = scanPts[scanHereIdx];
+      const dPrev = scanHereIdx>0 ? distKm(scanPts[scanHereIdx-1], me) : Infinity;
+      const dNext = scanHereIdx<scanPts.length-1 ? distKm(me, scanPts[scanHereIdx+1]) : Infinity;
+      hereCrowded = Math.min(dPrev, dNext) < CROWD_KM;
+    }
+  }
   events.forEach((e)=>{
     const ll = eventCoord(e);
     if(!ll) return;
@@ -856,7 +886,7 @@ function renderMap(dayObj, currentEvent){
     if(isHere) hereIdx = pts.length;
     const seq = pts.length + 1;
     pts.push(ll);
-    if(e.place && chosenForCoord.get(coordKeyOf(ll)) !== e._idx) return;
+    if(chosenForCoord.get(coordKeyOf(ll)).idx !== e._idx) return;
     const minor = !e.place;
     const isTransitEvt = catOf(e.type)==="transit";
     const markerEmoji = isTransitEvt ? (MODE_EMOJI[e.mode] || TYPE_ICON[e.type] || "📍") : (TYPE_ICON[e.type]||"📍");
@@ -865,7 +895,7 @@ function renderMap(dayObj, currentEvent){
     const artHtml = minor ? "" : markerArt(e.place);
     const hasArt = minor ? false : (!!e.place && !imgFailed.has("p:"+e.place));
     const marker = L.marker(ll, {
-      icon: makeIcon(markerEmoji, isHere, dayChanged ? seq*70 : null, minor, artHtml, hasArt),
+      icon: makeIcon(markerEmoji, isHere, dayChanged ? seq*70 : null, minor, artHtml, hasArt, hereCrowded),
       zIndexOffset: isHere ? 1000 : 0
     }).addTo(markersLayer);
     const place = e.place ? TRIP_DATA.places[e.place] : null;
