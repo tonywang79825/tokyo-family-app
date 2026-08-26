@@ -1452,8 +1452,10 @@ function bearingDeg(a, b){
   const x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLng);
   return (toDeg(Math.atan2(y,x))+360)%360;
 }
-// 圖示本身畫的朝向（順時針，0=正上方）：只校準有明顯方向性的插畫，其餘維持不旋轉
-const VEHICLE_ART_BEARING = {plane:225, taxi:225, twtaxi:225, car:225, bus:225, ferry:225, train:225};
+// 這些插畫是等角透視畫的（有固定相機視角，同時看得到車頂/車頭/車側），
+// 對它們做大角度旋轉會讓車身看起來像側翻或飛反了，不是正確模擬轉向的方式——
+// 改成只做左右鏡像：圖示本身都是面朝左下畫的，前進方向偏右（水平分量朝右）就整張圖左右翻轉。
+const VEHICLE_HAS_DIRECTIONAL_ART = {plane:true, taxi:true, twtaxi:true, car:true, bus:true, ferry:true, train:true};
 function bearingAlongRoute(pts, frac){
   if(!pts || pts.length<2) return null;
   const segs=[]; let total=0;
@@ -1514,17 +1516,18 @@ function liveVehicleTick(){
   const pos = pointAlongRoute(livePts || [from, to], frac);
   if(!pos) return;
   const emoji = MODE_EMOJI[next.mode] || (dayObj.day>=5 ? "🚗" : "🚃");
-  const artBase = VEHICLE_ART_BEARING[next.mode];
-  const bearing = artBase!=null ? bearingAlongRoute(livePts || [from, to], frac) : null;
-  const rotateStyle = bearing!=null ? ` style="transform:rotate(${((bearing-artBase+360)%360).toFixed(1)}deg)"` : "";
+  const hasArt = VEHICLE_HAS_DIRECTIONAL_ART[next.mode];
+  const bearing = hasArt ? bearingAlongRoute(livePts || [from, to], frac) : null;
+  const flipped = bearing!=null && Math.sin(bearing*Math.PI/180) >= 0;
+  const flipStyle = flipped ? ` style="transform:scaleX(-1)"` : "";
   const artHtml = modeArt(next.mode,"veh-img") + (next.lineKey ? lineArt(next.lineKey,"veh-img") : "");
   if(!liveVeh){
-    const icon = L.divIcon({className:"leaflet-div-icon", html:`<div class="vehicle"><span class="v-emoji">${emoji}</span><div class="v-art"${rotateStyle}>${artHtml}</div></div>`, iconSize:[44,44], iconAnchor:[22,22]});
+    const icon = L.divIcon({className:"leaflet-div-icon", html:`<div class="vehicle"><span class="v-emoji">${emoji}</span><div class="v-art"${flipStyle}>${artHtml}</div></div>`, iconSize:[44,44], iconAnchor:[22,22]});
     liveVeh = L.marker(pos, {icon, zIndexOffset:1100, interactive:false}).addTo(map);
   } else {
     liveVeh.setLatLng(pos);
     const artEl = liveVeh.getElement() && liveVeh.getElement().querySelector(".v-art");
-    if(artEl) artEl.style.transform = bearing!=null ? `rotate(${((bearing-artBase+360)%360).toFixed(1)}deg)` : "";
+    if(artEl) artEl.style.transform = flipped ? "scaleX(-1)" : "";
   }
   if(frac>=1 && !livePulsed){ livePulsed=true; arrivalPulse(to); }
 }
