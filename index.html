@@ -256,6 +256,10 @@
   .marker-pin.here.crowded{animation-name:markerGrowSm, floatSm;}
   @keyframes markerGrowSm{0%{transform:translateY(0) scale(var(--mzoom,1));}100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 1.3));}}
   @keyframes floatSm{0%,100%{transform:translateY(0) scale(calc(var(--mzoom,1) * 1.3));}50%{transform:translateY(-4px) scale(calc(var(--mzoom,1) * 1.34));}}
+  /* 不是「現在」但離「現在」很近的其他景點——「現在」都縮小了，這些普通 marker
+     沒跟著縮小反而變成畫面裡最大的東西，一樣要收斂 */
+  .marker-pin.crowded:not(.here){transform:scale(calc(var(--mzoom,1) * .55)) !important;}
+  .marker-dot.crowded:not(.here){transform:scale(calc(var(--mzoom,1) * .55)) !important;}
   .marker-drop{animation:drop .5s ease-out backwards;}
   @keyframes drop{0%{transform:translateY(-16px) scale(.7);opacity:0;}60%{transform:translateY(3px) scale(1.03);opacity:1;}100%{transform:translateY(0) scale(1);}}
   .route-line{animation:ant-march 1.4s linear infinite;}
@@ -727,8 +731,11 @@ function scrollToCurrentFocus(){
    ========================================================= */
 function renderStatus(){
   document.getElementById("statusClock").textContent = nowHM() + (SIM_ACTIVE ? " 🧪" : "");
-  const tripStart = new Date(TRIP_DATA.trip.dates.start+"T00:00:00");
-  const tripEnd = new Date(TRIP_DATA.trip.dates.end+"T23:59:59");
+  // simNow() 回傳的 Date 其實是「真實時刻 +9 小時」，UTC 欄位讀出來才會是 JST 牆鐘——
+  // 跟它比較的邊界時間也要套同樣的位移，不然邊界時間沒帶時區、被瀏覽器當地時區解析，
+  // 兩邊代表的真實時刻對不上，會在傍晚/深夜時段誤判成「還沒開始」或「已經結束」。
+  const tripStart = new Date(new Date(TRIP_DATA.trip.dates.start+"T00:00:00+09:00").getTime() + 9*3600000);
+  const tripEnd = new Date(new Date(TRIP_DATA.trip.dates.end+"T23:59:59+09:00").getTime() + 9*3600000);
   const now = simNow();
   const sub = document.getElementById("statusSub");
   if(now < tripStart){
@@ -825,7 +832,7 @@ function transitArt(e, cls){
 
 function makeIcon(emoji, isHere, dropDelay, minor, artHtml, hasArt, crowded){
   const cls = (minor ? "marker-dot" : "marker-pin") + (hasArt ? " has-photo" : "");
-  const pin = `<div class="${cls} ${isHere?'here':''} ${(isHere&&crowded)?'crowded':''}"><span class="pin-emoji">${emoji}</span>${artHtml||""}</div>`;
+  const pin = `<div class="${cls} ${isHere?'here':''} ${crowded?'crowded':''}"><span class="pin-emoji">${emoji}</span>${artHtml||""}</div>`;
   return L.divIcon({
     className:"leaflet-div-icon",
     html: dropDelay!=null ? `<div class="marker-drop" style="animation-delay:${dropDelay}ms">${pin}</div>` : pin,
@@ -879,6 +886,9 @@ function renderMap(dayObj, currentEvent){
       hereCrowded = Math.min(dPrev, dNext) < CROWD_KM;
     }
   }
+  // 「現在」旁邊的其他景點（不是現在，但離現在很近）也要一併縮小——不然「現在」縮
+  // 小了，旁邊那個沒縮小的普通 marker 反而變成最大、蓋住畫面或被下方卡片切到。
+  const hereLL = hereTarget ? eventCoord(hereTarget) : null;
   events.forEach((e)=>{
     const ll = eventCoord(e);
     if(!ll) return;
@@ -887,6 +897,7 @@ function renderMap(dayObj, currentEvent){
     const seq = pts.length + 1;
     pts.push(ll);
     if(chosenForCoord.get(coordKeyOf(ll)).idx !== e._idx) return;
+    const crowded = isHere ? hereCrowded : (!!hereLL && distKm(hereLL, ll) < CROWD_KM);
     const minor = !e.place;
     const isTransitEvt = catOf(e.type)==="transit";
     const markerEmoji = isTransitEvt ? (MODE_EMOJI[e.mode] || TYPE_ICON[e.type] || "📍") : (TYPE_ICON[e.type]||"📍");
@@ -895,7 +906,7 @@ function renderMap(dayObj, currentEvent){
     const artHtml = minor ? "" : markerArt(e.place);
     const hasArt = minor ? false : (!!e.place && !imgFailed.has("p:"+e.place));
     const marker = L.marker(ll, {
-      icon: makeIcon(markerEmoji, isHere, dayChanged ? seq*70 : null, minor, artHtml, hasArt, hereCrowded),
+      icon: makeIcon(markerEmoji, isHere, dayChanged ? seq*70 : null, minor, artHtml, hasArt, crowded),
       zIndexOffset: isHere ? 1000 : 0
     }).addTo(markersLayer);
     const place = e.place ? TRIP_DATA.places[e.place] : null;
