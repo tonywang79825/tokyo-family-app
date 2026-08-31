@@ -771,7 +771,8 @@ function renderDayChips(){
    ========================================================= */
 function initMap(){
   map = L.map("map", {zoomControl:false, attributionControl:false}).setView([35.68,139.75], 9);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19, attribution:"&copy; OpenStreetMap contributors"}).addTo(map);
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", {maxZoom:19, maxNativeZoom:16, attribution:"&copy; Esri"}).addTo(map);
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}", {maxZoom:19, maxNativeZoom:16, attribution:"&copy; Esri"}).addTo(map);
   markersLayer = L.layerGroup().addTo(map);
   map.on("zoom", updateMarkerScale);
   updateMarkerScale();
