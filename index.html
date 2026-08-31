@@ -771,7 +771,7 @@ function renderDayChips(){
    ========================================================= */
 function initMap(){
   map = L.map("map", {zoomControl:false, attributionControl:false}).setView([35.68,139.75], 9);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {maxZoom:19}).addTo(map);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19, attribution:"&copy; OpenStreetMap contributors"}).addTo(map);
   markersLayer = L.layerGroup().addTo(map);
   map.on("zoom", updateMarkerScale);
   updateMarkerScale();
