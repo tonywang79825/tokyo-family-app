@@ -538,7 +538,14 @@ function catOf(type){
 const MockSync = {
   _ns: "tokyo-trip-mock-v1",
   _read(){ try{ return JSON.parse(localStorage.getItem(this._ns)) || {}; }catch(e){ return {}; } },
-  _write(data){ localStorage.setItem(this._ns, JSON.stringify(data)); this._listeners.forEach(fn=>fn()); },
+  // 這是全檔唯一沒被保護的 localStorage 寫入。路線快取會持續長大，配額一旦被塞爆，
+  // 勾購物清單/跳過行程會 throw 而中斷 onclick——畫面看起來就是「點了沒反應」，
+  // 而且完全無法從畫面猜到原因。至少要吞下錯誤並明確告知。
+  _write(data){
+    try{ localStorage.setItem(this._ns, JSON.stringify(data)); }
+    catch(err){ try{ showToast("儲存空間已滿，這次變更沒有存下來"); }catch(e){} }
+    this._listeners.forEach(fn=>fn());
+  },
   _listeners: [],
   subscribe(fn){ this._listeners.push(fn); },
   getSetting(key, fallback){ const d=this._read(); return (d.settings && d.settings[key]) ?? fallback; },
@@ -686,6 +693,7 @@ let map, markersLayer, polyline;
 let lastFocusedKey = null;
 let lastFitDay = null;
 let lastChipScrollDay = null;
+let lastSeenDateStr = null;
 let passedLine = null;
 let staggerPending = true;
 // 地圖模式 / 行程列表模式(預設)：純畫面狀態，不記憶，每次重整回列表模式
@@ -1002,7 +1010,9 @@ function renderSheet(){
 
   // 大卡片的倒數：只有「還沒到達 mainEvent」（mainEvent 其實是 next）時才顯示，
   // 已經在 current 現場就不用倒數，倒數改放到下面的下一站小提示列。
-  const mainMins = !isCurrentMain ? minutesUntil(mainEvent?.time) : null;
+  // mainEvent 可能是 null（例如整天的行程都被使用者標記跳過），沒防護會讓 minutesUntil
+  // 收到 undefined 直接拋 TypeError，整個 renderSheet 中斷、底部卡片從此停在舊內容不再更新。
+  const mainMins = (!isCurrentMain && mainEvent) ? minutesUntil(mainEvent.time) : null;
   const cdHtml = (mainMins!=null && mainMins>0)
     ? `<div class="countdown ${mainMins<=15?'urgent':''}">⏳ 還有 <b>${mainMins>=60 ? Math.floor(mainMins/60)+" 小時 "+(mainMins%60)+" 分" : mainMins+" 分"}</b></div>`
     : "";
@@ -1074,7 +1084,7 @@ function renderSheet(){
       ? ((e.override && e.override.choice) ? `✅ 已選：${e.override.choice}` : `${e.note?e.note+"；":""}📋 點選查看 ${e.choices.length} 個候選`)
       : (e.note || (cat==="transit" ? stepsSummaryText(e.steps) : ""));
     const isFocus = current && e._idx===current._idx;
-    html += `<div class="event-row type-${cat} ${skipped?'skipped':''} ${staggerPending?'stagger':''} ${isFocus?'current-focus':''}" data-idx="${e._idx}"${staggerPending?` style="animation-delay:${i*35}ms"`:""} onclick="handleEventTap(${e._idx})" ontouchstart="startLongPress(${e._idx})" ontouchend="cancelLongPress()" onmousedown="startLongPress(${e._idx})" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()">
+    html += `<div class="event-row type-${cat} ${skipped?'skipped':''} ${staggerPending?'stagger':''} ${isFocus?'current-focus':''}" data-idx="${e._idx}"${staggerPending?` style="animation-delay:${i*35}ms"`:""} onclick="handleEventTap(${e._idx})" ontouchstart="startLongPress(${e._idx})" ontouchmove="cancelLongPress()" ontouchend="cancelLongPress()" onmousedown="startLongPress(${e._idx})" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()">
       <div class="time">${e.time}</div>
       <div class="thumb-sm">${icon}${cat==="transit" ? transitArt(e,"thumb-sm-img") : placePhoto(e.place||e.icon,"thumb-sm-img")}</div>
       <div class="et">
@@ -1249,7 +1259,8 @@ function openPlaceModal(placeKey, fallbackTitle, time, eventNote, eventDuration)
       ${p.hours?`<div class="info-row"><div class="k">開放時間</div><div>${p.hours}</div></div>`:""}
       ${priceStr?`<div class="info-row"><div class="k">價格</div><div>${priceStr}</div></div>`:""}
       ${p.status?`<div class="info-row"><div class="k">狀態</div><div>${statusBadge({status:p.status})||p.status}</div></div>`:""}
-      ${p.reservation?`<div class="info-row"><div class="k">確認碼</div><div onclick="copyText('${p.reservation}')" style="text-decoration:underline;cursor:pointer;">${p.reservation}（點擊複製）</div></div>`:""}
+      ${p.phone?`<div class="info-row"><div class="k">電話</div><div><a href="tel:${String(p.phone).split("（")[0].replace(/[^0-9+]/g,"")}" style="color:var(--accent);font-weight:700;text-decoration:none;">${p.phone}</a></div></div>`:""}
+      ${p.reservation?`<div class="info-row"><div class="k">確認碼</div><div onclick="copyText('${String(p.reservation)}')" style="text-decoration:underline;cursor:pointer;">${String(p.reservation)}（點擊複製）</div></div>`:""}
       ${tagsHtml}
       ${p.summary?`<div class="place-summary">${p.summary}</div>`:""}
       ${(p.notes && p.notes.length)?`<ul class="place-notes">${p.notes.map(n=>`<li>${n}</li>`).join("")}</ul>`:""}
@@ -1692,6 +1703,14 @@ function focusOnCurrentChange(dayObj, current, next, heading){
 }
 
 function renderAll(){
+  // 使用者手動看過別天之後 autoFollowToday 會關掉，原本沒有任何路徑會把它打開——
+  // 等於跨過午夜也不會自動跳到新的一天。改成「日期一換就恢復自動跟隨今天」，
+  // 這樣早上打開 app 一定停在今天，不會停在昨天看過的那頁。
+  const today = todayStr();
+  if(lastSeenDateStr !== today){
+    lastSeenDateStr = today;
+    autoFollowToday = true;
+  }
   if(autoFollowToday){
     const todayNum = getCurrentTripDay();
     if(todayNum !== null) selectedDayNum = todayNum;
@@ -1780,8 +1799,10 @@ function initGeo(){
 const ackedAlarms = new Set();
 function checkHardDeadlines(){
   const el = document.getElementById("alarmOverlay");
-  const dayObj = getAllDays().find(d=>d.day===selectedDayNum);
-  if(!dayObj || !dayObj.hardDeadlines || dayObj.date !== todayStr()){ el.classList.remove("show"); return; }
+  // 硬性時限警報一定要掃「今天」，不能綁 selectedDayNum——只要使用者滑去看別天的行程
+  // （例如 Day10 下午滑回 Day9 看照片），還車/報到的倒數警報就會整個靜音，那是最不能漏的一天。
+  const dayObj = getAllDays().find(d=>d.date===todayStr());
+  if(!dayObj || !dayObj.hardDeadlines){ el.classList.remove("show"); return; }
   const now = simNow();
   const nowSec = now.getUTCHours()*3600 + now.getUTCMinutes()*60 + now.getUTCSeconds();
   for(const hd of dayObj.hardDeadlines){
