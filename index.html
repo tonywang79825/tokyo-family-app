@@ -685,6 +685,7 @@ let autoFollowToday = true;
 let map, markersLayer, polyline;
 let lastFocusedKey = null;
 let lastFitDay = null;
+let lastChipScrollDay = null;
 let passedLine = null;
 let staggerPending = true;
 // 地圖模式 / 行程列表模式(預設)：純畫面狀態，不記憶，每次重整回列表模式
@@ -757,13 +758,26 @@ function renderStatus(){
 function renderDayChips(){
   const el = document.getElementById("dayChips");
   el.innerHTML = "";
+  let activeChip = null;
   getAllDays().forEach(d=>{
     const chip = document.createElement("div");
     chip.className = "chip" + (d.day===selectedDayNum ? " active":"");
     chip.innerHTML = `D${d.day}<span class="d">${d.date.slice(5).replace('-','/')}</span>`;
     chip.onclick = ()=>{ selectedDayNum=d.day; autoFollowToday=false; staggerPending=true; renderAll(); };
     el.appendChild(chip);
+    if(d.day===selectedDayNum) activeChip = chip;
   });
+  // 選到的日期若在日期列可視範圍外（D7 之後的 chip 位置已超出畫面寬度），要自動捲進來，
+  // 不然旅程後半段開 app 會看到一整排沒有任何高亮的 chip，根本不知道現在是第幾天。
+  // 只在「選到的日期真的變了」時捲動，避免每 30 秒的自動 render 把使用者手動捲的位置扯回去。
+  if(activeChip && lastChipScrollDay !== selectedDayNum){
+    lastChipScrollDay = selectedDayNum;
+    const stripRect = el.getBoundingClientRect();
+    const chipRect = activeChip.getBoundingClientRect();
+    if(chipRect.left < stripRect.left || chipRect.right > stripRect.right){
+      el.scrollTo({left: activeChip.offsetLeft - (el.clientWidth - activeChip.offsetWidth)/2, behavior:"smooth"});
+    }
+  }
 }
 
 /* =========================================================
@@ -890,6 +904,7 @@ function renderMap(dayObj, currentEvent){
   // 「現在」旁邊的其他景點（不是現在，但離現在很近）也要一併縮小——不然「現在」縮
   // 小了，旁邊那個沒縮小的普通 marker 反而變成最大、蓋住畫面或被下方卡片切到。
   const hereLL = hereTarget ? eventCoord(hereTarget) : null;
+  const segPts = [];
   events.forEach((e)=>{
     const ll = eventCoord(e);
     if(!ll) return;
@@ -897,6 +912,7 @@ function renderMap(dayObj, currentEvent){
     if(isHere) hereIdx = pts.length;
     const seq = pts.length + 1;
     pts.push(ll);
+    segPts.push(pts.length===1 ? [ll] : routeSegment(pts[pts.length-2], ll, e.mode));
     if(chosenForCoord.get(coordKeyOf(ll)).idx !== e._idx) return;
     const crowded = isHere ? hereCrowded : (!!hereLL && distKm(hereLL, ll) < CROWD_KM);
     const minor = !e.place;
@@ -919,8 +935,8 @@ function renderMap(dayObj, currentEvent){
   });
   if(pts.length>1){
     const split = hereIdx>=0 ? hereIdx : 0;
-    const passed = pts.slice(0, split+1);
-    const future = pts.slice(split);
+    const passed = segPts.slice(0, split+1).flat();
+    const future = segPts.slice(split+1).flat();
     if(passed.length>1) passedLine = L.polyline(passed, {color:"#A89F91", weight:3, opacity:.5}).addTo(map);
     if(future.length>1) polyline = L.polyline(future, {color:"#D44820", weight:3, dashArray:"6,8", opacity:.8, className:"route-line"}).addTo(map);
   }
@@ -1487,10 +1503,13 @@ const ROUTE_PROFILE = {
   car:"routed-car/route/v1/driving", taxi:"routed-car/route/v1/driving",
   bus:"routed-car/route/v1/driving", walk:"routed-foot/route/v1/foot"
 };
+function routeCacheKey(mode, from, to){
+  return `route:${mode}:${from[0].toFixed(4)},${from[1].toFixed(4)}-${to[0].toFixed(4)},${to[1].toFixed(4)}`;
+}
 async function fetchRealRoute(from, to, mode){
   const prof = ROUTE_PROFILE[mode];
   if(!prof) return [from, to];
-  const ck = `route:${mode}:${from[0].toFixed(4)},${from[1].toFixed(4)}-${to[0].toFixed(4)},${to[1].toFixed(4)}`;
+  const ck = routeCacheKey(mode, from, to);
   try{ const hit = localStorage.getItem(ck); if(hit) return JSON.parse(hit); }catch(err){}
   try{
     const r = await fetch(`https://routing.openstreetmap.de/${prof}/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`);
@@ -1499,6 +1518,44 @@ async function fetchRealRoute(from, to, mode){
     try{ localStorage.setItem(ck, JSON.stringify(pts)); }catch(err){}
     return pts;
   }catch(err){ return [from, to]; }
+}
+
+/* ---- 每日總覽的路線圖也要走真實道路（不只即時載具那段）——
+   car/taxi/bus/walk 這幾種模式，若該段路線已經快取過就直接拿來畫；
+   還沒快取則先用直線頂著畫（不阻塞渲染），背景非同步抓真實路線，
+   抓到後存快取並觸發一次 renderAll() 讓地圖用真實路線重畫。
+   train/plane/ferry/gondola 維持直線（鐵路線型/航班/水路不適合套道路路由）。 ---- */
+const segRouteMemCache = {};
+const segRoutePending = new Set();
+function getCachedRouteSync(mode, from, to){
+  if(!ROUTE_PROFILE[mode]) return null;
+  const key = routeCacheKey(mode, from, to);
+  if(segRouteMemCache[key]) return segRouteMemCache[key];
+  try{
+    const hit = localStorage.getItem(key);
+    if(hit){ const pts = JSON.parse(hit); segRouteMemCache[key] = pts; return pts; }
+  }catch(err){}
+  return null;
+}
+function ensureRouteFetched(mode, from, to){
+  if(!ROUTE_PROFILE[mode]) return;
+  const key = routeCacheKey(mode, from, to);
+  if(segRouteMemCache[key] || segRoutePending.has(key)) return;
+  segRoutePending.add(key);
+  fetchRealRoute(from, to, mode).then(pts=>{
+    segRoutePending.delete(key);
+    segRouteMemCache[key] = pts;
+    renderAll();
+  }).catch(()=>{ segRoutePending.delete(key); });
+}
+function routeSegment(from, to, mode){
+  // 同一個地點的兩個事件（例如「抵達民宿」跟稍後「民宿晚餐」）起訖座標相同，
+  // 沒有路線可走，發請求只是白費一次往返——直接回傳兩點了事。
+  if(distKm(from, to) < 0.03) return [from, to];
+  const cached = getCachedRouteSync(mode, from, to);
+  if(cached) return cached;
+  ensureRouteFetched(mode, from, to);
+  return [from, to];
 }
 
 function bearingDeg(a, b){
