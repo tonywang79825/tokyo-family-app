@@ -29,8 +29,12 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy));
+          // 只快取成功的回應：session 過期時 Supabase 會回 401，原本連 401 都寫進快取，
+          // 會把上一份好的行程資料覆蓋掉，之後離線就只拿得到那個 401。
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(req, copy));
+          }
           return res;
         })
         .catch(() => caches.match(req, { ignoreSearch: true }).then((m) => m || caches.match("./index.html")))

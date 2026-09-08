@@ -409,7 +409,7 @@ async function signInWithFamilyPassword(password){
   if(error){ setAuthMsg("密碼錯誤或登入失敗，請再試一次", true); return; }
   const tripData = await fetchTripData();
   if(!tripData){
-    setAuthMsg("此帳號尚未被授權，請聯絡 Tony", true);
+    setAuthMsg("連線失敗或此帳號未被授權，請確認網路後重試", true);
     return;
   }
   TRIP_DATA = tripData;
@@ -417,10 +417,38 @@ async function signInWithFamilyPassword(password){
   showAuthGate(false);
   startApp();
 }
+/* ---- 離線快取：把最後一次成功抓到的行程存在本機 ----
+   房總、館山、佐原這幾天訊號不穩，隧道與山區更是常態。原本只要 Supabase 抓不到就
+   擋在登入頁，等於在最需要看行程的地方整份行程消失；改成「先用本機快取把畫面撐起來，
+   背景再嘗試更新」。快取內容含訂位碼等敏感資訊——但 sw.js 本來就會快取同樣的回應、
+   且 app 沒有登出功能，實際曝露面沒有增加，真正的防線是手機本身的螢幕鎖。 ---- */
+const TRIP_CACHE_KEY = "tokyo-trip-data-cache-v1";
+function readTripCache(){
+  try{
+    const raw = localStorage.getItem(TRIP_CACHE_KEY);
+    if(!raw) return null;
+    const obj = JSON.parse(raw);
+    return (obj && obj.data) ? obj : null;
+  }catch(err){ return null; }
+}
+function writeTripCache(data){
+  try{ localStorage.setItem(TRIP_CACHE_KEY, JSON.stringify({at: Date.now(), data})); }catch(err){}
+}
 async function fetchTripData(){
   const { data, error } = await sb.from("trip_data").select("data").eq("id","main").single();
   if(error || !data) return null;
+  writeTripCache(data.data);
   return data.data;
+}
+// 用快取把 app 撐起來，並提示資料是什麼時候的
+function startFromCache(cached){
+  TRIP_DATA = cached.data;
+  VOUCHERS = cached.data.vouchers || [];
+  showAuthGate(false);
+  startApp();
+  const d = new Date(cached.at);
+  const stamp = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  setTimeout(()=>showToast(`目前離線，顯示 ${stamp} 同步的行程`), 800);
 }
 function wireAuthForm(){
   document.getElementById("authSubmit").onclick = ()=>{
@@ -431,21 +459,34 @@ function wireAuthForm(){
 }
 async function boot(){
   wireAuthForm();
-  const { data: { session } } = await sb.auth.getSession();
-  if(!session){
+  const cached = readTripCache();
+  try{
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session){
+      // 沒有 session 有兩種可能：真的沒登入過，或是離線導致 token 續期失敗。
+      // 曾經成功登入過（有快取）就先讓他看行程，不要把人擋在密碼頁外面。
+      if(cached){ startFromCache(cached); return; }
+      showAuthGate(true);
+      return;
+    }
+    const tripData = await fetchTripData();
+    if(!tripData){
+      if(cached){ startFromCache(cached); return; }
+      showAuthGate(true);
+      setAuthMsg("連線失敗或此帳號未被授權，請確認網路後重試", true);
+      return;
+    }
+    TRIP_DATA = tripData;
+    VOUCHERS = tripData.vouchers || [];
+    showAuthGate(false);
+    startApp();
+  }catch(err){
+    // 離線、CDN 掛掉、Supabase 逾時都會走到這裡。原本沒有 catch，整個 boot 會靜默死掉、
+    // 連登入頁都不會出現（authGate 預設 display:none），畫面只剩一片米色。
+    if(cached){ startFromCache(cached); return; }
     showAuthGate(true);
-    return;
+    setAuthMsg("目前無法連線，請確認網路後重新整理", true);
   }
-  const tripData = await fetchTripData();
-  if(!tripData){
-    showAuthGate(true);
-    setAuthMsg("此帳號尚未被授權，請聯絡 Tony", true);
-    return;
-  }
-  TRIP_DATA = tripData;
-  VOUCHERS = tripData.vouchers || [];
-  showAuthGate(false);
-  startApp();
 }
 
 const DAY0 = {
@@ -651,11 +692,28 @@ function getCurrentTripDay(){
   return found ? found.day : null;
 }
 
+/* ---- 事件時間一律換算成 JST 牆鐘再比對 ----
+   行程時間寫的是「當地時間」：Day1 出發那幾筆是台灣時間(+8)，其餘都是日本時間(+9)。
+   但比對「現在進行到哪」「還有幾分鐘」用的是 JST 牆鐘，直接拿台灣時間的字串去比，
+   整個台灣段會早 1 小時發生——在家等接送車時，app 會說「從家出發」已經過去了。
+   這裡在資料進入所有 render 路徑的唯一入口，補上換算後的 _jstTime 供比對用；
+   畫面顯示仍然用原本的 e.time（在台灣就是要看到台灣時間的 04:00）。 ---- */
+function eventLat(e){
+  if(e.coord) return e.coord[0];
+  const p = e.place && TRIP_DATA.places[e.place];
+  return p && p.coordinates ? p.coordinates.lat : null;
+}
+function eventJstHM(e){
+  const lat = eventLat(e);
+  if(lat === null || lat >= 30) return e.time;          // 日本（或判斷不出來）就照原樣
+  const [h,m] = e.time.split(":").map(Number);          // 台灣 +8 → JST +9，加一小時
+  return pad((h+1)%24) + ":" + pad(m);
+}
 function eventsWithOverrides(dayNum, events){
   const ov = MockSync.getOverrides();
   return events.map((e,i)=>{
     const o = ov[dayNum+"-"+i];
-    return {...e, _idx:i, override:o||null};
+    return {...e, _idx:i, override:o||null, _jstTime: eventJstHM(e)};
   });
 }
 
@@ -667,7 +725,7 @@ function getCurrentAndNextEvent(dayObj){
   const now = dayObj.date===todayStr() ? nowHM() : "00:00";
   let current=null, next=null, nextNext=null;
   for(let i=0;i<active.length;i++){
-    if(active[i].time <= now){ current = active[i]; }
+    if(active[i]._jstTime <= now){ current = active[i]; }
     else if(!next){ next = active[i]; }
     else { nextNext = active[i]; break; }
   }
@@ -676,7 +734,7 @@ function getCurrentAndNextEvent(dayObj){
   // 讓交通工具依「current.time → next.time」的完整區間逐步推進，而非等到快到才動
   let heading = false;
   if(current && next){
-    const elapsed = -minutesUntil(current.time);
+    const elapsed = -minutesUntil(current._jstTime || current.time);
     heading = current.duration != null ? elapsed >= current.duration : true;
   }
   return {current, next, nextNext, heading, all: events};
@@ -738,8 +796,20 @@ function scrollToCurrentFocus(){
 /* =========================================================
    渲染：StatusBar / DayChips
    ========================================================= */
+/* 出發當天飛機落地前，人還在台灣（+8），顯示 JST 會跟手錶差一小時、讓人不信任後面所有倒數。
+   落地(JST 11:00)之前就顯示台灣時間並標「台北」，落地後回到日本時間。 */
+function clockDisplay(){
+  const d = simNow();                               // JST 牆鐘
+  const isDepartureDay = todayStr() === TRIP_DATA.trip.dates.start;
+  const beforeLanding = d.getUTCHours() < 11;
+  if(isDepartureDay && beforeLanding){
+    const tw = new Date(d.getTime() - 3600000);     // JST −1 = 台灣時間
+    return pad(tw.getUTCHours())+":"+pad(tw.getUTCMinutes())+" 台北";
+  }
+  return nowHM();
+}
 function renderStatus(){
-  document.getElementById("statusClock").textContent = nowHM() + (SIM_ACTIVE ? " 🧪" : "");
+  document.getElementById("statusClock").textContent = clockDisplay() + (SIM_ACTIVE ? " 🧪" : "");
   // simNow() 回傳的 Date 其實是「真實時刻 +9 小時」，UTC 欄位讀出來才會是 JST 牆鐘——
   // 跟它比較的邊界時間也要套同樣的位移，不然邊界時間沒帶時區、被瀏覽器當地時區解析，
   // 兩邊代表的真實時刻對不上，會在傍晚/深夜時段誤判成「還沒開始」或「已經結束」。
@@ -830,24 +900,24 @@ function eventCoord(e){
   return null;
 }
 
-/* ---- 圖片管線：真照片與地圖 marker 共用同一張圖（assets/places/{key}.png，透明去背），缺圖自動退回 emoji ---- */
+/* ---- 圖片管線：真照片與地圖 marker 共用同一張圖（assets/places/{key}.webp，透明去背），缺圖自動退回 emoji ---- */
 const imgFailed = new Set();
 function imgFail(el, key){ imgFailed.add(key); const parent = el.parentElement; el.remove(); if(parent) parent.classList.remove("has-photo"); }
 function placePhoto(key, cls){
-  return (key && !imgFailed.has("p:"+key)) ? `<img class="${cls}" src="assets/places/${key}.png" onerror="imgFail(this,'p:${key}')">` : "";
+  return (key && !imgFailed.has("p:"+key)) ? `<img class="${cls}" src="assets/places/${key}.webp" onerror="imgFail(this,'p:${key}')">` : "";
 }
 function markerArt(key){
-  return (key && !imgFailed.has("p:"+key)) ? `<img class="mk-img" src="assets/places/${key}.png" onerror="imgFail(this,'p:${key}')">` : "";
+  return (key && !imgFailed.has("p:"+key)) ? `<img class="mk-img" src="assets/places/${key}.webp" onerror="imgFail(this,'p:${key}')">` : "";
 }
-// 交通方式（走路/電車/計程車…）也可以有專屬插畫，跟地點照片同一套機制：assets/modes/{mode}.png，缺圖退回 emoji。
+// 交通方式（走路/電車/計程車…）也可以有專屬插畫，跟地點照片同一套機制：assets/modes/{mode}.webp，缺圖退回 emoji。
 function modeArt(mode, cls){
-  return (mode && !imgFailed.has("m:"+mode)) ? `<img class="${cls}" src="assets/modes/${mode}.png" onerror="imgFail(this,'m:${mode}')">` : "";
+  return (mode && !imgFailed.has("m:"+mode)) ? `<img class="${cls}" src="assets/modes/${mode}.webp" onerror="imgFail(this,'m:${mode}')">` : "";
 }
-// 電車還可以再細分成實際的線名插畫（assets/lines/{lineKey}.png），疊在 modeArt 上面——
+// 電車還可以再細分成實際的線名插畫（assets/lines/{lineKey}.webp），疊在 modeArt 上面——
 // lineKey 圖片載入失敗會被移除，底下的 modeArt 圖片就會露出來，modeArt 也失敗才退回 emoji，三層疊加缺圖不會壞。
 // 只有已確認單一路線、資料夠明確的事件才會有 lineKey；多線混合或還沒確認清楚的維持只顯示通用電車圖。
 function lineArt(lineKey, cls){
-  return (lineKey && !imgFailed.has("l:"+lineKey)) ? `<img class="${cls}" src="assets/lines/${lineKey}.png" onerror="imgFail(this,'l:${lineKey}')">` : "";
+  return (lineKey && !imgFailed.has("l:"+lineKey)) ? `<img class="${cls}" src="assets/lines/${lineKey}.webp" onerror="imgFail(this,'l:${lineKey}')">` : "";
 }
 function transitArt(e, cls){
   return modeArt(e.mode, cls) + (e.lineKey ? lineArt(e.lineKey, cls) : "");
@@ -1012,11 +1082,11 @@ function renderSheet(){
   // 已經在 current 現場就不用倒數，倒數改放到下面的下一站小提示列。
   // mainEvent 可能是 null（例如整天的行程都被使用者標記跳過），沒防護會讓 minutesUntil
   // 收到 undefined 直接拋 TypeError，整個 renderSheet 中斷、底部卡片從此停在舊內容不再更新。
-  const mainMins = (!isCurrentMain && mainEvent) ? minutesUntil(mainEvent.time) : null;
+  const mainMins = (!isCurrentMain && mainEvent) ? minutesUntil(mainEvent._jstTime || mainEvent.time) : null;
   const cdHtml = (mainMins!=null && mainMins>0)
     ? `<div class="countdown ${mainMins<=15?'urgent':''}">⏳ 還有 <b>${mainMins>=60 ? Math.floor(mainMins/60)+" 小時 "+(mainMins%60)+" 分" : mainMins+" 分"}</b></div>`
     : "";
-  const hintMins = hintEvent ? minutesUntil(hintEvent.time) : null;
+  const hintMins = hintEvent ? minutesUntil(hintEvent._jstTime || hintEvent.time) : null;
   const hintCdText = (hintMins!=null && hintMins>0)
     ? `⏳ 還有 ${hintMins>=60 ? Math.floor(hintMins/60)+" 小時 "+(hintMins%60)+" 分" : hintMins+" 分"}`
     : "";
@@ -1634,8 +1704,8 @@ function liveVehicleTick(){
   }
   const now = simNow();
   const nowMin = now.getUTCHours()*60 + now.getUTCMinutes() + now.getUTCSeconds()/60;
-  const depMin = current.duration != null ? hmToMin(current.time)+current.duration : hmToMin(current.time);
-  const arrMin = hmToMin(next.time);
+  const depMin = current.duration != null ? hmToMin(current._jstTime || current.time)+current.duration : hmToMin(current._jstTime || current.time);
+  const arrMin = hmToMin(next._jstTime || next.time);
   const frac = Math.max(0, Math.min(1, (nowMin-depMin) / Math.max(1, arrMin-depMin)));
   const pos = pointAlongRoute(livePts || [from, to], frac);
   if(!pos) return;
