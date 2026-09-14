@@ -343,6 +343,9 @@
 <div class="menu-panel" id="menuPanel">
   <button class="menu-item" id="menuShop">🛍️ 購物清單</button>
   <button class="menu-item" id="menuTicket">🎫 憑證口袋</button>
+  <button class="menu-item" id="menuChecklist">🧳 出發待辦</button>
+  <button class="menu-item" id="menuEmergency">🚑 緊急資訊</button>
+  <button class="menu-item" id="menuOfflinePack">📦 下載離線包</button>
   <button class="menu-item" id="menuLocate">📍 我的位置</button>
   <button class="menu-item" id="menuHideTransit">🚗 隱藏交通方式</button>
 </div>
@@ -368,6 +371,9 @@
 <div class="modal-sheet" id="overrideModal"></div>
 <div class="modal-sheet" id="shopModal"></div>
 <div class="modal-sheet" id="voucherModal"></div>
+<div class="modal-sheet" id="checklistModal"></div>
+<div class="modal-sheet" id="emergencyModal"></div>
+<div class="modal-sheet" id="offlinePackModal"></div>
 <div id="alarmOverlay"></div>
 
 <div id="authGate">
@@ -409,7 +415,7 @@ async function signInWithFamilyPassword(password){
   if(error){ setAuthMsg("密碼錯誤或登入失敗，請再試一次", true); return; }
   const tripData = await fetchTripData();
   if(!tripData){
-    setAuthMsg("連線失敗或此帳號未被授權，請確認網路後重試", true);
+    setAuthMsg("此帳號尚未被授權，請聯絡 Tony", true);
     return;
   }
   TRIP_DATA = tripData;
@@ -473,7 +479,7 @@ async function boot(){
     if(!tripData){
       if(cached){ startFromCache(cached); return; }
       showAuthGate(true);
-      setAuthMsg("連線失敗或此帳號未被授權，請確認網路後重試", true);
+      setAuthMsg("此帳號尚未被授權，請聯絡 Tony", true);
       return;
     }
     TRIP_DATA = tripData;
@@ -559,6 +565,90 @@ const SHOPPING = [
   ]},
 ];
 
+// 出發待辦清單，內容以 wiki/checklist.md 的行動日曆為準；三組是依「行動日」欄位換算成
+// 相對今天（app 開啟當下）的緊急度分組，group 只影響顯示的分頁，不影響同步狀態。
+const CHECKLIST_GROUPS = [
+  {key:"today", label:"今天"},
+  {key:"d915", label:"9/15"},
+  {key:"after", label:"落地後"},
+];
+// 駕照日文譯本、旅遊不便險已於 wiki/checklist.md 移入「已完成」，不再列入待辦。
+const CHECKLIST_ITEMS = [
+  {key:"povo-esim", group:"today", text:"povo eSIM 申請與安裝", note:"需能收 SMS 驗證；上網方案購買時機抓落地當天"},
+  {key:"amazon-preorder", group:"today", text:"Amazon Japan 預購下單", note:"寄掬水亭，指定 9/23–9/24 到貨"},
+  {key:"futtsu-guestbook", group:"today", text:"富津オフグリッドハウス填寫「宿泊名簿」取得門鎖密碼", note:"入住前3–7天房東才會傳連結（抓9/16–9/20注意信箱），也要看過房東入口路線影片"},
+  {key:"docs-summary", group:"today", text:"憑證總整理", note:"所有訂單截圖存手機相簿 + 列印紙本；哈利波特影城/合味道紀念館/大宮鐵道博物館尤其建議列印，天外天、西武獅已印過"},
+  {key:"checkin-baggage", group:"today", text:"虎航線上報到/行李規定確認", note:"線上報到開放時間為起飛前48小時（IT200 9/18 06:35起飛→9/16 06:35開放；IT701 9/27 20:45起飛→9/25 20:45開放），起飛前1小時截止；手提行李限10kg，託運已預購20kg（爸爸去程）/全家20kg（回程）"},
+  {key:"luggage-pack", group:"today", text:"行李箱打包確認", note:"行李箱配置、託運額度、打包檢查清單"},
+  {key:"vjw", group:"today", text:"填寫 Visit Japan Web", note:"入境審查/海關/免稅QR一次搞定；沒有「提前太多天不能填」的限制，官方只建議至少6小時前完成，所有訂房班機都已確定，現在就可以填不用等"},
+  {key:"child-health-kit", group:"today", text:"兒童健康包準備", note:"常備藥（退燒/腸胃/暈車）、防蚊液、防曬乳、體溫計、OK繃、輕便雨衣"},
+  {key:"tigerair-checkin", group:"d915", text:"虎航線上報到", note:"線上報到窗口為起飛前48小時～前1小時：IT200去程9/16 06:35起、IT701回程9/25 20:45起"},
+  {key:"kikusuitei-charge", group:"d915", text:"掬水亭扣款日確認", note:"Agoda #1743439576，MasterCard ••2401 自動扣款約 CNY 2,754.25"},
+  {key:"kikusuitei-cancel-deadline", group:"d915", text:"掬水亭免費取消期限（心理提醒）", note:"9/16 23:59 後取消將產生費用，無需動作"},
+  {key:"day1-checkin-decide", group:"after", text:"Day1 check-in後：去賽馬場或二日市公園", note:"落地後check-in優先（15:00起可辦理）；之後視時間/體力二選一——大井賽馬場(14:40已開門，最晚約17:00前進場)或走路5分鐘去二日市公園(免費、無時間壓力)"},
+  {key:"aquapark-ticket", group:"after", text:"Maxell Aqua Park Shinagawa 線上購票", note:"Day 3當天出發前用手機買即可，跟提前幾天買沒差（同樣可能需要現場整理券）"},
+  {key:"futtsu-kitchen-check", group:"after", text:"Day 05 現場確認富津民宿廚房設備", note:"房東禁止露台/庭院BBQ，Day05晚餐定案吃火鍋；當面確認爐具/鍋具/餐具數量"},
+  {key:"nex-ticket", group:"after", text:"N'EX 車票現場購買", note:"落地入境領行李後直接到成田機場站售票機/窗口買，不提前訂票；目的地直接報「大井町」而非「品川」，一次買齊全程"},
+  {key:"etc-card-confirm", group:"after", text:"確認/加租 ETC 卡（租車 X82309）", note:"取車當天9/22務必確認：Day7新路線會經過高尾山IC，該IC已改ETC專用無現金車道，沒有ETC卡走不通；現場加租約¥330/日"},
+  {key:"tengaiten-breakfast", group:"after", text:"天外天朝食向前台預約", note:"9/23、9/25 晚，向掬水亭前台開口，07:00–08:30"},
+];
+
+// 緊急資訊，內容以 wiki/checklist.md 的「🚨意外/緊急狀況處理」一節為準（家人自己整理過的實際應對方式），
+// 租車事故一節為 wiki/logistics/transport.md 的租車門市資訊；兒童醫療資訊目前尚未提供，明確標示待填，不可用猜測內容補上。
+const EMERGENCY_INFO = {
+  hotline: [
+    {label:"警察", number:"110"},
+    {label:"消防／救護車", number:"119"},
+  ],
+  sections: [
+    {title:"🛂 護照遺失/被偷", items:[
+      "先報警拿受理證明 → 駐日台北經濟文化代表處（東京）補發：東京都港区白金台5-20-2，電話 (81-3) 3280-7811",
+      "急難救助 24 小時專線（出發前建議上外交部網站再次確認最新號碼並截圖存手機）：080-1009-7179 / 080-1009-7436",
+    ]},
+    {title:"🏥 生病/受傷需要就醫", items:[
+      "撥打 119（救急車，免費）",
+      "輕症可用 Google 地圖搜「内科」「小児科」+ 現在地找最近診所",
+      "房總半島/佐原等偏遠地區車程可能較長，先評估是否自駕送醫更快",
+    ]},
+    {title:"👮 遇搶劫/需要警察", items:[
+      "撥打 110（警察），或直接走進最近的「交番」(派出所)",
+    ]},
+    {title:"🚗 租車事故（Nippon Rent-A-Car）", items:[
+      "先確保人身安全並報警(110)",
+      "取車店（大井町駅前店）TEL：05017122655",
+      "還車店（成田営業所）TEL：05017122770",
+      "保險方案：安心コース，含免責額補償制度(CDW)、NOC補償制度(ECO)；勿自行判斷賠償責任，聯絡門市說明事故",
+    ]},
+    {title:"🎒 東西/行李遺失", items:[
+      "電車上：聯絡該鐵道公司遺失物中心（JR東日本 050-2016-1601）",
+      "計程車：記下乘車證上的車行電話",
+      "景點/餐廳：先回撥該店電話詢問",
+    ]},
+    {title:"👨‍👩‍👧 迷路/走散（尤其帶小孩）", items:[
+      "出發前跟小孩約定「走失原地不動」+ 教小孩記住當天住宿名稱",
+      "大人之間用 LINE 即時位置分享",
+    ]},
+    {title:"💳 現金卡片全丟", items:[
+      "台新/JCB 卡緊急止付＋補發電話（出發前抄在紙本，不要只存手機）",
+      "先用另一張備用卡應急，飯店櫃檯通常可協助換匯救急",
+    ]},
+    {title:"✈️ 班機延誤/取消", items:[
+      "已投保旅遊不便險（全家已投保完成）",
+      "留存登機證+延誤證明（航空公司櫃檯索取），回國後申請理賠",
+      "〔待填〕保單號碼／24 小時協助專線",
+    ]},
+    {title:"☔ 天氣/店家臨時公休", items:[
+      "各天天氣備案已內建於行程頁",
+      "店家公休當天用 Google 地圖查「今日營業時間」再出發，避免撲空",
+    ]},
+    {title:"👶 兒童醫療資訊", items:[
+      "〔待填〕過敏史",
+      "〔待填〕健保卡號",
+      "〔待填〕行程沿線可就醫的兒科/急診資訊",
+    ]},
+  ],
+};
+
 const TYPE_ICON = {
   attraction:"🎡", meal:"🍜", transport:"🚃", logistics:"🧳", checkin:"🛏️",
   activity:"🎢", sports:"⚾", free:"🚶", rest:"😴", shopping:"🛍️", waypoint:"✈️"
@@ -600,6 +690,114 @@ const MockSync = {
   },
   getShopping(){ const d=this._read(); return d.shopping || {}; },
   setShopping(itemKey, checked){ const d=this._read(); d.shopping=d.shopping||{}; d.shopping[itemKey]=checked; this._write(d); },
+};
+
+/* =========================================================
+   ChecklistSync — 出發待辦的跨裝置共享狀態，真的寫回 Supabase
+   （跟 MockSync 不同：這裡登入同一家庭帳號的所有手機要即時看到彼此的勾選，
+   單純存 localStorage 不夠）。本機留一份鏡像 + 待同步佇列：
+   - 勾選當下先樂觀更新鏡像並試著寫回 Supabase
+   - 離線或寫入失敗：該筆留在待同步佇列，UI 顯示「尚未同步」，之後 online 事件觸發重試
+   - 「最後一次操作覆蓋前次」，不需要合併/衝突處理
+   ========================================================= */
+const ChecklistSync = {
+  _ns: "tokyo-trip-checklist-v1",
+  _read(){ try{ return JSON.parse(localStorage.getItem(this._ns)) || {}; }catch(e){ return {}; } },
+  _write(data){ localStorage.setItem(this._ns, JSON.stringify(data)); },
+  getAll(){ return this._read(); },
+  isPending(key){ const d=this._read(); return !!(d[key] && d[key].pending); },
+  // 從 Supabase 抓最新狀態合併進本機鏡像；本機還有「尚未同步」的項目不能被覆蓋，
+  // 否則使用者剛勾的東西畫面上會被拉回舊狀態、假裝同步成功了。
+  async refresh(){
+    const d = this._read();
+    const { data, error } = await sb.from("checklist_status").select("item_key,completed,updated_at");
+    if(error || !data) return false;
+    data.forEach(row=>{
+      const local = d[row.item_key];
+      if(local && local.pending) return;
+      d[row.item_key] = {completed: row.completed, updated_at: row.updated_at, pending:false};
+    });
+    this._write(d);
+    return true;
+  },
+  async setCompleted(itemKey, completed){
+    const d = this._read();
+    const updated_at = new Date().toISOString();
+    d[itemKey] = {completed, updated_at, pending:true};
+    this._write(d);
+    await this._push(itemKey);
+  },
+  async _push(itemKey){
+    const d = this._read();
+    const entry = d[itemKey];
+    if(!entry || !entry.pending) return true;
+    if(!navigator.onLine){ return false; }
+    const { error } = await sb.from("checklist_status").upsert({
+      item_key: itemKey, completed: entry.completed, updated_at: entry.updated_at,
+    });
+    if(error) return false;
+    d[itemKey] = {...entry, pending:false};
+    this._write(d);
+    return true;
+  },
+  // 恢復連線後把所有還沒同步成功的項目逐一重推，失敗的維持「尚未同步」不假裝成功
+  async flushPending(){
+    const d = this._read();
+    const keys = Object.keys(d).filter(k=>d[k].pending);
+    for(const k of keys){ await this._push(k); }
+  },
+};
+window.addEventListener("online", ()=>{ ChecklistSync.flushPending().then(()=>{ if(document.getElementById("checklistModal").classList.contains("show")) renderChecklistModal(); }); });
+
+/* =========================================================
+   OfflinePack — 「下載離線包」：主動把 trip_data/待辦/地點插畫/已有真實檔案的憑證
+   都抓一輪存進快取，不用等使用者剛好翻到那天才觸發 SW 的被動快取。
+   憑證 PDF 另外存進獨立的 Cache Storage（用 path 當固定 key），因為 Storage 簽章連結
+   每次網址都不同，直接靠 SW 的網址快取比對會 miss——必須用穩定的 key 才能離線比對到。
+   ========================================================= */
+const OfflinePack = {
+  _docCache: "tokyo-trip-voucher-docs-v1",
+  _lastKey: "tokyo-trip-offline-pack-last",
+  _docKey(path){ return new Request("https://voucher-doc.local/"+path); },
+  async getVoucherFile(path){
+    if(!("caches" in window)) return null;
+    const c = await caches.open(this._docCache);
+    const hit = await c.match(this._docKey(path));
+    return hit ? hit.blob() : null;
+  },
+  async cacheVoucherFile(path){
+    const { data, error } = await sb.storage.from("vouchers").createSignedUrl(path, 3600);
+    if(error || !data) return false;
+    const res = await fetch(data.signedUrl);
+    if(!res.ok) return false;
+    const c = await caches.open(this._docCache);
+    await c.put(this._docKey(path), new Response(await res.blob(), {headers:{"content-type":"application/pdf"}}));
+    return true;
+  },
+  getLastUpdated(){ return localStorage.getItem(this._lastKey); },
+  // 逐項下載，onProgress(doneCount, totalCount, label) 給 UI 即時更新；單項失敗不中斷整體流程
+  async downloadAll(onProgress){
+    const steps = [];
+    steps.push({label:"出發待辦", run: ()=>ChecklistSync.refresh()});
+    if(TRIP_DATA && TRIP_DATA.places){
+      Object.keys(TRIP_DATA.places).forEach(key=>{
+        steps.push({label:"地點插畫："+key, run: ()=>fetch(`assets/places/${key}.webp`).catch(()=>{})});
+      });
+    }
+    const modes = new Set(), lines = new Set();
+    (getAllDays()||[]).forEach(d=>(d.events||[]).forEach(e=>{ if(e.mode) modes.add(e.mode); if(e.lineKey) lines.add(e.lineKey); }));
+    modes.forEach(m=>steps.push({label:"交通圖示："+m, run: ()=>fetch(`assets/modes/${m}.webp`).catch(()=>{})}));
+    lines.forEach(l=>steps.push({label:"路線圖示："+l, run: ()=>fetch(`assets/lines/${l}.webp`).catch(()=>{})}));
+    VOUCHERS.forEach(v=>{
+      (v.files||[]).forEach(f=>{ if(f.path) steps.push({label:"憑證："+f.label, run: ()=>this.cacheVoucherFile(f.path)}); });
+    });
+    for(let i=0;i<steps.length;i++){
+      onProgress && onProgress(i, steps.length, steps[i].label);
+      try{ await steps[i].run(); }catch(err){ /* 單項失敗不中斷，離線包本來就是盡力而為 */ }
+    }
+    onProgress && onProgress(steps.length, steps.length, "完成");
+    localStorage.setItem(this._lastKey, new Date().toISOString());
+  },
 };
 
 /* =========================================================
@@ -750,6 +948,7 @@ let autoFollowToday = true;
 let map, markersLayer, polyline;
 let lastFocusedKey = null;
 let lastFitDay = null;
+let lastMapRenderSig = null;
 let lastChipScrollDay = null;
 let lastSeenDateStr = null;
 let passedLine = null;
@@ -936,12 +1135,19 @@ function makeIcon(emoji, isHere, dropDelay, minor, artHtml, hasArt, crowded){
 }
 
 function renderMap(dayObj, currentEvent){
-  markersLayer.clearLayers();
-  if(polyline){ map.removeLayer(polyline); polyline=null; }
-  if(passedLine){ map.removeLayer(passedLine); passedLine=null; }
   const dayChanged = lastFitDay !== dayObj.day;
   const events = eventsWithOverrides(dayObj.day, getDayEvents(dayObj)).filter(e=> !(e.override && e.override.status==="skip"));
   const hereTarget = currentEvent;
+  // 「現在在哪」跟事件清單都沒變就整批跳過重建——renderAll() 每次時間推進(含自動模擬)
+  // 都會呼叫這裡，若無條件 clearLayers()+全部重畫，.here marker 的 CSS 動畫
+  // (markerGrow/float) 會被砍掉重來、每次都從頭長大一次，永遠跑不完整個漂浮循環，
+  // 肉眼看起來就是「跳來跳去」；只有真的換了「現在」或換天才需要真的重建。
+  const renderSig = dayObj.day+"|"+(hereTarget?hereTarget._idx:-1)+"|"+events.map(e=>e._idx+":"+(e.override?e.override.status:"")).join(",");
+  if(renderSig === lastMapRenderSig){ updateMarkerScale(); return; }
+  lastMapRenderSig = renderSig;
+  markersLayer.clearLayers();
+  if(polyline){ map.removeLayer(polyline); polyline=null; }
+  if(passedLine){ map.removeLayer(passedLine); passedLine=null; }
   const pts = [];
   let hereIdx = -1;
   // 同一個座標如果被兩個事件同時連到（例如「抵達機場」跟稍後「機場出發」，或是
@@ -1277,7 +1483,7 @@ function showModal(id){
 }
 function hideModals(){
   document.getElementById("backdrop").classList.remove("show");
-  ["placeModal","routeModal","overrideModal","shopModal","voucherModal"].forEach(id=>document.getElementById(id).classList.remove("show"));
+  ["placeModal","routeModal","overrideModal","shopModal","voucherModal","checklistModal","emergencyModal","offlinePackModal"].forEach(id=>document.getElementById(id).classList.remove("show"));
 }
 document.getElementById("backdrop").onclick = hideModals;
 
@@ -1494,6 +1700,101 @@ function toggleShop(key, checked, inputEl){
       prog.textContent = `已買 ${done} / 共 ${total} 項`;
     }
   }
+}
+
+/* ---- 出發待辦（跨裝置共享，見 ChecklistSync） ---- */
+async function openChecklistModal(){
+  showModal("checklistModal");
+  renderChecklistModal();
+  await ChecklistSync.refresh();
+  renderChecklistModal();
+}
+function renderChecklistModal(){
+  const state = ChecklistSync.getAll();
+  const total = CHECKLIST_ITEMS.length;
+  const done = CHECKLIST_ITEMS.filter(it=>state[it.key] && state[it.key].completed).length;
+  const el = document.getElementById("checklistModal");
+  let html = `<div class="modal-header"><h3>🧳 出發待辦</h3><button onclick="hideModals()">✕</button></div>
+    <div class="modal-body"><div class="shop-progress">已完成 ${done} / 共 ${total} 項</div>`;
+  CHECKLIST_GROUPS.forEach(g=>{
+    const items = CHECKLIST_ITEMS.filter(it=>it.group===g.key);
+    if(!items.length) return;
+    html += `<div class="shop-day">${g.label}</div>`;
+    items.forEach(it=>{
+      const st = state[it.key] || {};
+      const isChecked = !!st.completed;
+      html += `<div class="shop-item ${isChecked?'checked':''}">
+        <input type="checkbox" ${isChecked?"checked":""} onchange="toggleChecklistItem('${it.key}',this.checked,this)">
+        <div class="si-name">${it.text}${st.pending?`<span class="badge pending">尚未同步</span>`:""}<br><span style="font-size:11px;color:var(--ink-soft);">${it.note||""}</span></div>
+      </div>`;
+    });
+  });
+  html += `</div>`;
+  el.innerHTML = html;
+}
+async function toggleChecklistItem(key, checked, inputEl){
+  if(inputEl) inputEl.closest(".shop-item").classList.toggle("checked", checked);
+  await ChecklistSync.setCompleted(key, checked);
+  renderChecklistModal();
+}
+
+/* ---- 緊急資訊（純靜態內容，需可離線開啟，見 EMERGENCY_INFO） ---- */
+function openEmergencyModal(){
+  const el = document.getElementById("emergencyModal");
+  const hotlineHtml = EMERGENCY_INFO.hotline.map(h=>
+    `<div style="flex:1;text-align:center;"><div style="font-size:11px;color:var(--ink-soft);">${h.label}</div><div style="font-size:26px;font-weight:900;color:var(--red);">${h.number}</div></div>`
+  ).join("");
+  const sectionsHtml = EMERGENCY_INFO.sections.map(s=>`
+    <div class="shop-day">${s.title}</div>
+    <ul class="place-notes">${s.items.map(i=>`<li>${i}</li>`).join("")}</ul>
+  `).join("");
+  el.innerHTML = `<div class="modal-header"><h3>🚑 緊急資訊</h3><button onclick="hideModals()">✕</button></div>
+    <div class="modal-body">
+      <div style="position:sticky;top:0;z-index:1;display:flex;gap:10px;background:var(--paper);border:1px solid var(--paper-2);border-radius:12px;padding:10px 0;margin-bottom:10px;">${hotlineHtml}</div>
+      ${sectionsHtml}
+    </div>`;
+  showModal("emergencyModal");
+}
+
+/* ---- 離線包（見 OfflinePack） ---- */
+function formatLastUpdated(iso){
+  if(!iso) return "尚未下載過";
+  const d = new Date(iso);
+  return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function openOfflinePackModal(){
+  const el = document.getElementById("offlinePackModal");
+  el.innerHTML = `<div class="modal-header"><h3>📦 下載離線包</h3><button onclick="hideModals()">✕</button></div>
+    <div class="modal-body">
+      <div class="shop-progress">上次下載：<span id="opLastUpdated">${formatLastUpdated(OfflinePack.getLastUpdated())}</span></div>
+      <button class="btn primary" style="width:100%;margin-bottom:6px;" id="opDownloadBtn" onclick="runOfflinePackDownload()">開始下載／更新離線包</button>
+      <div id="opProgress" style="font-size:12px;color:var(--ink-soft);min-height:18px;margin:4px 0 10px;"></div>
+      <div class="shop-day">✅ 離線包會包含</div>
+      <ul class="place-notes">
+        <li>Day 1–10 完整行程、地點插畫</li>
+        <li>出發待辦、緊急資訊</li>
+        <li>已有真實檔案（PDF）的憑證</li>
+      </ul>
+      <div class="shop-day">📶 這些一定需要網路，離線包無法涵蓋</div>
+      <ul class="place-notes">
+        <li>Google Maps 導航、即時路況/班次</li>
+        <li>天氣預報</li>
+        <li>teamLab／哈利波特影城：需登入官網當天才產生的 QR</li>
+        <li>TableCheck 訂位查詢連結（ざうお、天外天，可用已存的確認單 PDF 代替）</li>
+      </ul>
+    </div>`;
+  showModal("offlinePackModal");
+}
+async function runOfflinePackDownload(){
+  const btn = document.getElementById("opDownloadBtn");
+  const prog = document.getElementById("opProgress");
+  btn.disabled = true;
+  await OfflinePack.downloadAll((done, total, label)=>{
+    prog.textContent = `(${done}/${total}) ${label}`;
+  });
+  btn.disabled = false;
+  document.getElementById("opLastUpdated").textContent = formatLastUpdated(OfflinePack.getLastUpdated());
+  showToast("✅ 離線包已更新");
 }
 
 /* =========================================================
@@ -1829,12 +2130,12 @@ function copyVoucher(c){ navigator.clipboard?.writeText(c); showToast("✅ 已�
 function voucherTicketHtml(v){
   if(!v) return "";
   const hasCode = v.code && v.code!=="待確認";
-  // files 陣列裡每一項可以是 Storage 檔案（path，點擊現拉簽章連結）或外部票券連結（url，直接開新分頁）
+  // files 陣列裡每一項可以是 Storage 檔案（path，可納入離線包）或外部票券連結（url，一定要連網開，標📶）
   const fileBtns = (v.files && v.files.length) ? v.files.map(f=>
-    f.url ? `<a class="vt-file" href="${f.url}" target="_blank" rel="noopener">🔗 ${f.label}</a>`
+    f.url ? `<a class="vt-file" href="${f.url}" target="_blank" rel="noopener">🔗📶 ${f.label}</a>`
           : `<button class="vt-file" onclick="openVoucherFile('${f.path}')">📄 ${f.label}</button>`
   ).join("") : "";
-  const urlBtn = v.url ? `<a class="vt-file" href="${v.url}" target="_blank" rel="noopener">🔗 開啟票券頁面</a>` : "";
+  const urlBtn = v.url ? `<a class="vt-file" href="${v.url}" target="_blank" rel="noopener">🔗📶 開啟票券頁面</a>` : "";
   const filesInner = fileBtns || urlBtn;
   const codeHtml = hasCode ? `<div class="vt-code"><span class="vt-code-text">🎫 ${v.code}</span><button class="vt-copy" onclick="copyVoucher('${v.code}')">複製</button></div>` : "";
   const filesHtml = filesInner ? `<div class="vt-files${hasCode?"":" no-code"}">${urlBtn}${fileBtns}</div>` : "";
@@ -1842,9 +2143,14 @@ function voucherTicketHtml(v){
 }
 async function openVoucherFile(path){
   showToast("開啟中…");
+  // 先看離線包有沒有存過這份檔案——有的話直接開本機副本，離線時也能用；
+  // 沒有才連網現拉簽章連結（並順手存一份進離線包，下次就不用再連網）。
+  const cached = await OfflinePack.getVoucherFile(path);
+  if(cached){ window.open(URL.createObjectURL(cached), "_blank"); return; }
   const { data, error } = await sb.storage.from("vouchers").createSignedUrl(path, 3600);
-  if(error || !data){ showToast("❌ 無法開啟文件"); return; }
+  if(error || !data){ showToast("❌ 無法開啟文件（需要網路連線）"); return; }
   window.open(data.signedUrl, "_blank");
+  OfflinePack.cacheVoucherFile(path).catch(()=>{});
 }
 
 /* ---- GPS 藍點 ---- */
@@ -1903,6 +2209,9 @@ function startApp(){
   });
   document.getElementById("menuShop").onclick = ()=>{ closeMenu(); openShopModal(); };
   document.getElementById("menuTicket").onclick = ()=>{ closeMenu(); openVoucherModal(); };
+  document.getElementById("menuChecklist").onclick = ()=>{ closeMenu(); openChecklistModal(); };
+  document.getElementById("menuEmergency").onclick = ()=>{ closeMenu(); openEmergencyModal(); };
+  document.getElementById("menuOfflinePack").onclick = ()=>{ closeMenu(); openOfflinePackModal(); };
   document.getElementById("menuLocate").onclick = ()=>{
     closeMenu();
     if(userLL) map.flyTo(userLL, 16, {duration:.8});
